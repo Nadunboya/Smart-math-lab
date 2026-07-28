@@ -1,5 +1,21 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Authentication
+
+Sign-in is Google OAuth via Supabase Auth. First-time users are sent to
+`/onboarding` to provide grade, student name, guardian name, guardian phone
+number, an optional other phone number, and address; returning users land
+directly on the home page. See `backend/README.md` for the FastAPI service
+that stores this profile data and `backend/supabase_schema.sql` for the
+`students` table.
+
+1. Copy `.env.example` to `.env.local` and fill in your Supabase project URL
+   and anon key (Project Settings > API), plus the FastAPI backend URL.
+2. In Supabase, enable the Google provider (Authentication > Providers) and
+   add `http://localhost:3000/auth/callback` (and your production URL) as an
+   authorized redirect.
+3. Set up and run the backend per `backend/README.md`.
+
 ## Getting Started
 
 First, run the development server:

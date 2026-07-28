@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Unit } from "../../lib/data";
 import { UnitIcons, Icons } from "../../lib/icons";
 import { grade6Units } from "../../lib/data";
+import { StudentProfile } from "../../lib/types";
 import UnitCard from "./UnitCard";
 import ConceptCard from "./ConceptCard";
 import WelcomeBanner from "../WelcomeBanner";
@@ -12,12 +13,14 @@ interface MathLabPageProps {
   selectedUnit: Unit | null;
   setSelectedUnit: (unit: Unit | null) => void;
   onConceptClick: () => void;
+  profile: StudentProfile;
 }
 
 export default function MathLabPage({
   selectedUnit,
   setSelectedUnit,
   onConceptClick,
+  profile,
 }: MathLabPageProps) {
   if (selectedUnit) {
     const UnitIcon = UnitIcons[selectedUnit.iconKey];
@@ -98,7 +101,7 @@ export default function MathLabPage({
         exit={{ opacity: 0, x: 36 }}
         transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
       >
-        <WelcomeBanner />
+        <WelcomeBanner profile={profile} />
 
         <div className="flex items-center justify-between mb-6">
           <div>

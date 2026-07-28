@@ -2,8 +2,13 @@
 
 import { motion } from "framer-motion";
 import { Icons } from "../lib/icons";
+import { StudentProfile } from "../lib/types";
 
-export default function WelcomeBanner() {
+export default function WelcomeBanner({
+  profile,
+}: {
+  profile: StudentProfile;
+}) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 24 }}
@@ -22,11 +27,11 @@ export default function WelcomeBanner() {
       <div className="relative z-10">
         <p className="text-slate text-sm mb-1">Welcome back,</p>
         <h1 className="font-heading font-bold text-2xl md:text-3xl text-white mb-2">
-          Kasun Perera
+          {profile.student_name}
         </h1>
         <p className="text-white/60 text-sm md:text-base max-w-lg">
-          Grade 6 Mathematics — 10 units ready to explore. Pick a topic below
-          and start your learning journey in the Math Lab.
+          Grade {profile.grade} Mathematics — 10 units ready to explore. Pick
+          a topic below and start your learning journey in the Math Lab.
         </p>
         <div className="flex items-center gap-4 mt-4 flex-wrap">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-cyan/10 text-cyan border border-cyan/20">
