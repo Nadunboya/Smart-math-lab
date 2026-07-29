@@ -18,12 +18,27 @@ export default async function Page() {
   } = await supabase.auth.getSession();
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+  const authHeader = { Authorization: `Bearer ${session?.access_token}` };
+
   const profileRes = await fetch(`${apiUrl}/api/students/me`, {
-    headers: { Authorization: `Bearer ${session?.access_token}` },
+    headers: authHeader,
     cache: "no-store",
   });
 
   if (profileRes.status === 404) {
+    // Not every signed-in account is a student — invited teacher accounts
+    // have no student profile at all, so check that before assuming this
+    // is a new student who needs onboarding.
+    const teacherRes = await fetch(`${apiUrl}/api/teachers/lookup`, {
+      headers: authHeader,
+      cache: "no-store",
+    });
+
+    if (teacherRes.ok) {
+      const teacher = await teacherRes.json();
+      redirect(teacher.onboarded ? "/teacher" : "/teacher/onboarding");
+    }
+
     redirect("/onboarding");
   }
 
