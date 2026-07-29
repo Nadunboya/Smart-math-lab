@@ -14,6 +14,7 @@ export interface Concept {
   id: number;
   name: string;
   description: string;
+  body: string | null;
 }
 
 export interface ShortNote {

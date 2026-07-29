@@ -73,14 +73,6 @@ export default function HomeClient({
     router.replace("/login");
   }, [showToast, router]);
 
-  /* Concept click */
-  const handleConceptClick = useCallback(() => {
-    showToast(
-      "Lab visualization will load here — connect to backend to enable",
-      "info",
-    );
-  }, [showToast]);
-
   /* Notes read more */
   const handleReadMore = useCallback(() => {
     showToast("Full notes will load here — connect to backend", "info");
@@ -109,7 +101,6 @@ export default function HomeClient({
               units={units}
               selectedUnit={selectedUnit}
               setSelectedUnit={setSelectedUnit}
-              onConceptClick={handleConceptClick}
               profile={profile}
             />
           )}

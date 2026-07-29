@@ -32,6 +32,7 @@ create table if not exists public.concepts (
     unit_id bigint not null references public.units (id) on delete cascade,
     name text not null,
     description text not null,
+    body text,
     sort_order integer not null default 0
 );
 create index if not exists concepts_unit_id_idx on public.concepts (unit_id, sort_order);

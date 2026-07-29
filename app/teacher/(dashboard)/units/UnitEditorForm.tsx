@@ -11,6 +11,7 @@ const ICON_KEYS = Object.keys(UnitIcons);
 interface ConceptRow {
   name: string;
   description: string;
+  body: string;
 }
 
 interface NoteRow {
@@ -36,7 +37,11 @@ export default function UnitEditorForm({
   const [description, setDescription] = useState(initialUnit?.description ?? "");
   const [sortOrder, setSortOrder] = useState(initialUnit?.sort_order ?? 0);
   const [concepts, setConcepts] = useState<ConceptRow[]>(
-    initialUnit?.concepts.map((c) => ({ name: c.name, description: c.description })) ?? [],
+    initialUnit?.concepts.map((c) => ({
+      name: c.name,
+      description: c.description,
+      body: c.body ?? "",
+    })) ?? [],
   );
   const [notes, setNotes] = useState<NoteRow[]>(
     initialUnit?.short_notes.map((n) => ({ content: n.content })) ?? [],
@@ -80,7 +85,12 @@ export default function UnitEditorForm({
       sort_order: sortOrder,
       concepts: concepts
         .filter((c) => c.name.trim() && c.description.trim())
-        .map((c, i) => ({ name: c.name.trim(), description: c.description.trim(), sort_order: i })),
+        .map((c, i) => ({
+          name: c.name.trim(),
+          description: c.description.trim(),
+          body: c.body.trim() || null,
+          sort_order: i,
+        })),
       short_notes: notes
         .filter((n) => n.content.trim())
         .map((n, i) => ({ content: n.content.trim(), sort_order: i })),
@@ -220,7 +230,9 @@ export default function UnitEditorForm({
           <span className="text-xs font-medium text-white/70">Concepts</span>
           <button
             type="button"
-            onClick={() => setConcepts((prev) => [...prev, { name: "", description: "" }])}
+            onClick={() =>
+              setConcepts((prev) => [...prev, { name: "", description: "", body: "" }])
+            }
             className="text-xs text-cyan hover:underline"
           >
             + Add concept
@@ -248,10 +260,24 @@ export default function UnitEditorForm({
               <textarea
                 value={c.description}
                 onChange={(e) => updateConcept(i, "description", e.target.value)}
-                placeholder="Concept description"
+                placeholder="Short description (shown on the concept card)"
                 rows={2}
                 className={`${inputClass} resize-none`}
               />
+              <div>
+                <textarea
+                  value={c.body}
+                  onChange={(e) => updateConcept(i, "body", e.target.value)}
+                  placeholder="Launch Lab lesson content (Markdown) — headings, lists, tables, bold, etc."
+                  rows={6}
+                  className={`${inputClass} resize-y font-mono text-xs`}
+                />
+                <span className="block text-xs text-slate mt-1">
+                  Shown to students when they open this concept. Supports Markdown
+                  (# headings, **bold**, lists, tables). Leave blank to show
+                  &quot;coming soon&quot; instead.
+                </span>
+              </div>
             </div>
           ))}
         </div>

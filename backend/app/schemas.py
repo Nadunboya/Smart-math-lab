@@ -46,6 +46,7 @@ class ConceptOut(BaseModel):
     id: int
     name: str
     description: str
+    body: str | None
 
 
 class ShortNoteOut(BaseModel):
@@ -69,6 +70,7 @@ class UnitOut(BaseModel):
 class ConceptIn(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     description: str = Field(min_length=1, max_length=2000)
+    body: str | None = Field(default=None, max_length=20000)
     sort_order: int = 0
 
 

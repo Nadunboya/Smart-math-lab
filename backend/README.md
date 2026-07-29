@@ -24,6 +24,9 @@ Run these against your Supabase project (SQL Editor), in order:
    `grade` once you have that curriculum content ready; no code changes
    needed for a new grade to show up.
 4. `supabase_teachers_schema.sql` — the `teachers` table.
+5. `supabase_migrate_concept_body.sql` — adds the `body` (Markdown lesson
+   content) column to `concepts`. Fresh installs don't need this — it's
+   already in `supabase_content_schema.sql`.
 
 Supported grades are 6-11 (`MIN_GRADE`/`MAX_GRADE` in `app/constants.py`). If
 you already ran `supabase_schema.sql` / `supabase_content_schema.sql` before
@@ -62,9 +65,11 @@ uvicorn app.main:app --reload --port 8000
   `student_name`, `grade` (6-11), `guardian_name`, `guardian_phone`,
   `other_phone` (optional), `address`. Requires the same bearer token.
 - `GET /api/units?grade=N` — returns all units (with nested concepts and
-  short notes) for that grade, ordered for display. No auth required —
-  curriculum content is the same for every student in a grade, so this is
-  cacheable and shared instead of being fetched per user.
+  short notes) for that grade, ordered for display. Each concept includes an
+  optional `body` — Markdown lesson content rendered on the student-facing
+  "Launch Lab" view, `null` if the teacher hasn't written it yet. No auth
+  required — curriculum content is the same for every student in a grade,
+  so this is cacheable and shared instead of being fetched per user.
 - `GET /api/units/{id}` — a single unit, same shape as above entry. No auth.
 - `POST /api/units`, `PUT /api/units/{id}`, `DELETE /api/units/{id}` —
   create/update/delete a unit and its concepts/short notes. Requires a

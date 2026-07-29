@@ -1,17 +1,18 @@
 "use client";
 
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Unit, StudentProfile } from "../../lib/types";
+import { Unit, Concept, StudentProfile } from "../../lib/types";
 import { UnitIcons, Icons } from "../../lib/icons";
 import UnitCard from "./UnitCard";
 import ConceptCard from "./ConceptCard";
+import ConceptDetail from "./ConceptDetail";
 import WelcomeBanner from "../WelcomeBanner";
 
 interface MathLabPageProps {
   units: Unit[];
   selectedUnit: Unit | null;
   setSelectedUnit: (unit: Unit | null) => void;
-  onConceptClick: () => void;
   profile: StudentProfile;
 }
 
@@ -19,9 +20,27 @@ export default function MathLabPage({
   units,
   selectedUnit,
   setSelectedUnit,
-  onConceptClick,
   profile,
 }: MathLabPageProps) {
+  const [selectedConcept, setSelectedConcept] = useState<Concept | null>(null);
+
+  const backToUnits = () => {
+    setSelectedUnit(null);
+    setSelectedConcept(null);
+  };
+
+  if (selectedUnit && selectedConcept) {
+    return (
+      <AnimatePresence mode="wait">
+        <ConceptDetail
+          concept={selectedConcept}
+          unitAccent={selectedUnit.accent_color}
+          onBack={() => setSelectedConcept(null)}
+        />
+      </AnimatePresence>
+    );
+  }
+
   if (selectedUnit) {
     const UnitIcon = UnitIcons[selectedUnit.icon_key];
 
@@ -36,7 +55,7 @@ export default function MathLabPage({
         >
           {/* 返回按钮 */}
           <button
-            onClick={() => setSelectedUnit(null)}
+            onClick={backToUnits}
             className="flex items-center gap-2 text-sm text-slate hover:text-white transition-colors mb-6 group"
           >
             <Icons.chevLeft size={18} />
@@ -87,7 +106,7 @@ export default function MathLabPage({
                 concept={c}
                 index={i}
                 unitAccent={selectedUnit.accent_color}
-                onClick={onConceptClick}
+                onClick={() => setSelectedConcept(c)}
               />
             ))}
           </div>

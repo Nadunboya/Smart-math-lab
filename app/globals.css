@@ -138,4 +138,63 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
+
+  /* 教师撰写的概念正文（Markdown） */
+  .concept-markdown {
+    @apply text-sm text-white/70 leading-relaxed;
+  }
+  .concept-markdown h1,
+  .concept-markdown h2,
+  .concept-markdown h3 {
+    @apply font-heading font-semibold text-white mt-6 mb-2 first:mt-0;
+  }
+  .concept-markdown h1 {
+    @apply text-xl;
+  }
+  .concept-markdown h2 {
+    @apply text-lg;
+  }
+  .concept-markdown h3 {
+    @apply text-base;
+  }
+  .concept-markdown p {
+    @apply mb-4;
+  }
+  .concept-markdown ul {
+    @apply list-disc pl-5 mb-4 space-y-1;
+  }
+  .concept-markdown ol {
+    @apply list-decimal pl-5 mb-4 space-y-1;
+  }
+  .concept-markdown strong {
+    @apply text-white font-semibold;
+  }
+  .concept-markdown code {
+    @apply bg-white/5 text-cyan rounded px-1.5 py-0.5 font-mono text-xs;
+  }
+  .concept-markdown pre {
+    @apply bg-deep border border-white/[0.06] rounded-xl p-4 mb-4 overflow-x-auto;
+  }
+  .concept-markdown pre code {
+    @apply bg-transparent p-0;
+  }
+  .concept-markdown blockquote {
+    @apply border-l-2 border-cyan/40 pl-4 italic text-white/55 mb-4;
+  }
+  .concept-markdown a {
+    @apply text-cyan underline underline-offset-2;
+  }
+  .concept-markdown hr {
+    @apply border-white/[0.08] my-6;
+  }
+  .concept-markdown table {
+    @apply w-full text-left mb-4 border-collapse;
+  }
+  .concept-markdown th,
+  .concept-markdown td {
+    @apply border border-white/[0.08] px-3 py-2;
+  }
+  .concept-markdown th {
+    @apply text-white font-semibold bg-white/[0.03];
+  }
 }
