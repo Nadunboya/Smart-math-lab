@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import { Icons } from "../../lib/icons";
 import { createClient } from "../../../lib/supabase/client";
 
-const GRADES = Array.from({ length: 13 }, (_, i) => i + 1);
+const GRADES = Array.from({ length: 6 }, (_, i) => i + 6);
 
 export default function TeacherOnboardingPage() {
   const router = useRouter();

@@ -15,7 +15,7 @@
 
 create table if not exists public.units (
     id bigint generated always as identity primary key,
-    grade integer not null check (grade between 1 and 13),
+    grade integer not null check (grade between 6 and 11),
     name text not null,
     sinhala_name text,
     accent_color text not null default '#5B4FE5',

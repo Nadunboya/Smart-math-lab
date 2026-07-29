@@ -25,6 +25,11 @@ Run these against your Supabase project (SQL Editor), in order:
    needed for a new grade to show up.
 4. `supabase_teachers_schema.sql` — the `teachers` table.
 
+Supported grades are 6-11 (`MIN_GRADE`/`MAX_GRADE` in `app/constants.py`). If
+you already ran `supabase_schema.sql` / `supabase_content_schema.sql` before
+this range was narrowed from 1-13, also run `supabase_migrate_grade_range.sql`
+once to update the existing check constraints — fresh installs don't need it.
+
 Also enable the Google provider under Authentication > Providers, with your
 app's `/auth/callback` URL registered as an authorized redirect URI.
 
@@ -54,7 +59,7 @@ uvicorn app.main:app --reload --port 8000
   they haven't completed onboarding yet. Requires
   `Authorization: Bearer <supabase-access-token>`.
 - `POST /api/students` — creates the signed-in user's profile. Body:
-  `student_name`, `grade` (1-13), `guardian_name`, `guardian_phone`,
+  `student_name`, `grade` (6-11), `guardian_name`, `guardian_phone`,
   `other_phone` (optional), `address`. Requires the same bearer token.
 - `GET /api/units?grade=N` — returns all units (with nested concepts and
   short notes) for that grade, ordered for display. No auth required —

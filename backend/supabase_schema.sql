@@ -9,7 +9,7 @@ create table if not exists public.students (
     id uuid primary key references auth.users (id) on delete cascade,
     email text not null unique,
     student_name text not null,
-    grade integer not null check (grade between 1 and 13),
+    grade integer not null check (grade between 6 and 11),
     guardian_name text not null,
     guardian_phone text not null,
     other_phone text,

@@ -1,0 +1,2 @@
+MIN_GRADE = 6
+MAX_GRADE = 11

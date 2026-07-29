@@ -2,6 +2,7 @@ from collections import defaultdict
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from ..constants import MAX_GRADE, MIN_GRADE
 from ..deps import CurrentTeacher, get_current_teacher, require_grade_access
 from ..schemas import ConceptOut, ShortNoteOut, UnitIn, UnitOut
 from ..supabase_client import supabase_admin
@@ -76,7 +77,7 @@ def _replace_children(unit_id: int, payload: UnitIn) -> None:
 # instead of issuing one fetch (and one cache entry) per user. Writes below
 # are teacher-only and scoped to the grades that teacher is assigned to.
 @router.get("", response_model=list[UnitOut])
-def list_units(grade: int = Query(ge=1, le=13)):
+def list_units(grade: int = Query(ge=MIN_GRADE, le=MAX_GRADE)):
     units_result = (
         supabase_admin.table("units")
         .select("*")

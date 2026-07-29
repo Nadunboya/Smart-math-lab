@@ -2,10 +2,12 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator
 
+from .constants import MAX_GRADE, MIN_GRADE
+
 
 class StudentProfileIn(BaseModel):
     student_name: str = Field(min_length=1, max_length=200)
-    grade: int = Field(ge=1, le=13)
+    grade: int = Field(ge=MIN_GRADE, le=MAX_GRADE)
     guardian_name: str = Field(min_length=1, max_length=200)
     guardian_phone: str = Field(min_length=1, max_length=30)
     other_phone: str | None = Field(default=None, max_length=30)
@@ -76,7 +78,7 @@ class ShortNoteIn(BaseModel):
 
 
 class UnitIn(BaseModel):
-    grade: int = Field(ge=1, le=13)
+    grade: int = Field(ge=MIN_GRADE, le=MAX_GRADE)
     name: str = Field(min_length=1, max_length=200)
     sinhala_name: str | None = Field(default=None, max_length=200)
     accent_color: str = Field(default="#5B4FE5", max_length=20)
@@ -96,8 +98,8 @@ class TeacherOnboardingIn(BaseModel):
     @field_validator("grades")
     @classmethod
     def grades_in_range(cls, value: list[int]) -> list[int]:
-        if any(g < 1 or g > 13 for g in value):
-            raise ValueError("grades must be between 1 and 13")
+        if any(g < MIN_GRADE or g > MAX_GRADE for g in value):
+            raise ValueError(f"grades must be between {MIN_GRADE} and {MAX_GRADE}")
         return sorted(set(value))
 
 
