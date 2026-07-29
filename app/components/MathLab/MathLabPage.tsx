@@ -1,15 +1,14 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { Unit } from "../../lib/data";
+import { Unit, StudentProfile } from "../../lib/types";
 import { UnitIcons, Icons } from "../../lib/icons";
-import { grade6Units } from "../../lib/data";
-import { StudentProfile } from "../../lib/types";
 import UnitCard from "./UnitCard";
 import ConceptCard from "./ConceptCard";
 import WelcomeBanner from "../WelcomeBanner";
 
 interface MathLabPageProps {
+  units: Unit[];
   selectedUnit: Unit | null;
   setSelectedUnit: (unit: Unit | null) => void;
   onConceptClick: () => void;
@@ -17,13 +16,14 @@ interface MathLabPageProps {
 }
 
 export default function MathLabPage({
+  units,
   selectedUnit,
   setSelectedUnit,
   onConceptClick,
   profile,
 }: MathLabPageProps) {
   if (selectedUnit) {
-    const UnitIcon = UnitIcons[selectedUnit.iconKey];
+    const UnitIcon = UnitIcons[selectedUnit.icon_key];
 
     return (
       <AnimatePresence mode="wait">
@@ -49,25 +49,29 @@ export default function MathLabPage({
           <div className="flex items-start gap-4 mb-8">
             <div
               className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0"
-              style={{ background: `${selectedUnit.accent}15` }}
+              style={{ background: `${selectedUnit.accent_color}15` }}
             >
-              {UnitIcon && <UnitIcon size={44} color={selectedUnit.accent} />}
+              {UnitIcon && (
+                <UnitIcon size={44} color={selectedUnit.accent_color} />
+              )}
             </div>
             <div>
               <h2 className="font-heading font-bold text-2xl md:text-3xl text-white">
                 {selectedUnit.name}
               </h2>
-              <p
-                className="text-sm mt-0.5"
-                style={{
-                  fontFamily: '"Noto Sans Sinhala", sans-serif',
-                  color: selectedUnit.accent,
-                }}
-              >
-                {selectedUnit.sinhala}
-              </p>
+              {selectedUnit.sinhala_name && (
+                <p
+                  className="text-sm mt-0.5"
+                  style={{
+                    fontFamily: '"Noto Sans Sinhala", sans-serif',
+                    color: selectedUnit.accent_color,
+                  }}
+                >
+                  {selectedUnit.sinhala_name}
+                </p>
+              )}
               <p className="text-sm text-white/50 mt-2 max-w-lg">
-                {selectedUnit.desc}
+                {selectedUnit.description}
               </p>
             </div>
           </div>
@@ -82,7 +86,7 @@ export default function MathLabPage({
                 key={c.id}
                 concept={c}
                 index={i}
-                unitAccent={selectedUnit.accent}
+                unitAccent={selectedUnit.accent_color}
                 onClick={onConceptClick}
               />
             ))}
@@ -109,24 +113,36 @@ export default function MathLabPage({
               All Units
             </h2>
             <p className="text-sm text-slate mt-0.5">
-              Sri Lankan Grade 6 Local Syllabus
+              Grade {profile.grade} Local Syllabus
             </p>
           </div>
           <span className="px-3 py-1.5 rounded-xl text-xs font-mono font-medium bg-white/5 text-white/40 border border-white/[0.06]">
-            {grade6Units.length} units
+            {units.length} units
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {grade6Units.map((unit, i) => (
-            <UnitCard
-              key={unit.id}
-              unit={unit}
-              index={i}
-              onClick={() => setSelectedUnit(unit)}
-            />
-          ))}
-        </div>
+        {units.length === 0 ? (
+          <div className="rounded-2xl border border-white/[0.06] bg-card-navy p-10 text-center">
+            <p className="text-white/70 font-medium mb-1">
+              Content coming soon
+            </p>
+            <p className="text-sm text-slate">
+              Grade {profile.grade} units haven&apos;t been added yet — check
+              back soon.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {units.map((unit, i) => (
+              <UnitCard
+                key={unit.id}
+                unit={unit}
+                index={i}
+                onClick={() => setSelectedUnit(unit)}
+              />
+            ))}
+          </div>
+        )}
       </motion.div>
     </AnimatePresence>
   );

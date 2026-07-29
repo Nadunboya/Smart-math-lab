@@ -38,3 +38,26 @@ class StudentProfileOut(BaseModel):
     other_phone: str | None
     address: str
     created_at: datetime
+
+
+class ConceptOut(BaseModel):
+    id: int
+    name: str
+    description: str
+
+
+class ShortNoteOut(BaseModel):
+    id: int
+    content: str
+
+
+class UnitOut(BaseModel):
+    id: int
+    grade: int
+    name: str
+    sinhala_name: str | None
+    accent_color: str
+    icon_key: str
+    description: str
+    concepts: list[ConceptOut]
+    short_notes: list[ShortNoteOut]

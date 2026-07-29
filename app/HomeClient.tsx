@@ -9,13 +9,18 @@ import ShortNotesPage from "./components/ShortNotes/ShortNotesPage";
 import MathEnginePage from "./components/MathEngine/MathEnginePage";
 import ToastContainer from "./components/ToastContainer";
 import { useToast } from "../hooks/useToast";
-import { Unit } from "./lib/data";
-import { StudentProfile } from "./lib/types";
+import { Unit, StudentProfile } from "./lib/types";
 import { createClient } from "../lib/supabase/client";
 
 type TabKey = "lab" | "notes" | "engine";
 
-export default function HomeClient({ profile }: { profile: StudentProfile }) {
+export default function HomeClient({
+  profile,
+  units,
+}: {
+  profile: StudentProfile;
+  units: Unit[];
+}) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabKey>("lab");
   const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
@@ -101,6 +106,7 @@ export default function HomeClient({ profile }: { profile: StudentProfile }) {
         <div key={tabKey}>
           {activeTab === "lab" && (
             <MathLabPage
+              units={units}
               selectedUnit={selectedUnit}
               setSelectedUnit={setSelectedUnit}
               onConceptClick={handleConceptClick}
@@ -108,7 +114,7 @@ export default function HomeClient({ profile }: { profile: StudentProfile }) {
             />
           )}
           {activeTab === "notes" && (
-            <ShortNotesPage onReadMore={handleReadMore} />
+            <ShortNotesPage units={units} onReadMore={handleReadMore} />
           )}
           {activeTab === "engine" && <MathEnginePage />}
         </div>

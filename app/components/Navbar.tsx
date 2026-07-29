@@ -2,7 +2,6 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { Icons } from "../lib/icons";
-import { Unit } from "../lib/data";
 import { StudentProfile } from "../lib/types";
 
 type TabKey = "lab" | "notes" | "engine";
