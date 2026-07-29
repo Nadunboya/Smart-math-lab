@@ -1,111 +1,65 @@
-"use client";
+import { redirect } from "next/navigation";
+import { createClient } from "../lib/supabase/server";
+import HomeClient from "./HomeClient";
+import { StudentProfile, Unit } from "./lib/types";
 
-import { useState, useEffect, useCallback } from "react";
-import Navbar from "./components/Navbar";
-import BottomTabBar from "./components/BottomTabBar";
-import MathLabPage from "./components/MathLab/MathLabPage";
-import ShortNotesPage from "./components/ShortNotes/ShortNotesPage";
-import MathEnginePage from "./components/MathEngine/MathEnginePage";
-import ToastContainer from "./components/ToastContainer";
-import { useToast } from "../hooks/useToast";
-import { Unit } from "./lib/data";
+export default async function Page() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-type TabKey = "lab" | "notes" | "engine";
+  if (!user) {
+    redirect("/login");
+  }
 
-export default function HomePage() {
-  const [activeTab, setActiveTab] = useState<TabKey>("lab");
-  const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
-  const [scrolled, setScrolled] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
-  const { toasts, showToast } = useToast();
-  const [tabKey, setTabKey] = useState(0);
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
-  /* 滚动监听 */
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 10);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+  const authHeader = { Authorization: `Bearer ${session?.access_token}` };
 
-  /* 点击外部关闭下拉菜单 */
-  useEffect(() => {
-    if (!profileOpen) return;
-    const close = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (
-        !target.closest('[aria-label="Profile menu"]') &&
-        !target.closest('[role="menu"]')
-      ) {
-        setProfileOpen(false);
-      }
-    };
-    document.addEventListener("click", close);
-    return () => document.removeEventListener("click", close);
-  }, [profileOpen]);
+  const profileRes = await fetch(`${apiUrl}/api/students/me`, {
+    headers: authHeader,
+    cache: "no-store",
+  });
 
-  /* 标签切换 */
-  const handleTabChange = useCallback(
-    (tab: TabKey) => {
-      if (tab === activeTab) return;
-      setSelectedUnit(null);
-      setTabKey((k) => k + 1);
-      setActiveTab(tab);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    },
-    [activeTab],
-  );
+  if (profileRes.status === 404) {
+    // Not every signed-in account is a student — invited teacher accounts
+    // have no student profile at all, so check that before assuming this
+    // is a new student who needs onboarding.
+    const teacherRes = await fetch(`${apiUrl}/api/teachers/lookup`, {
+      headers: authHeader,
+      cache: "no-store",
+    });
 
-  /* 登出 */
-  const handleLogout = useCallback(() => {
-    setProfileOpen(false);
-    showToast("You have been logged out", "success");
-  }, [showToast]);
+    if (teacherRes.ok) {
+      const teacher = await teacherRes.json();
+      redirect(teacher.onboarded ? "/teacher" : "/teacher/onboarding");
+    }
 
-  /* 概念点击 */
-  const handleConceptClick = useCallback(() => {
-    showToast(
-      "Lab visualization will load here — connect to backend to enable",
-      "info",
-    );
-  }, [showToast]);
+    redirect("/onboarding");
+  }
 
-  /* 笔记阅读更多 */
-  const handleReadMore = useCallback(() => {
-    showToast("Full notes will load here — connect to backend", "info");
-  }, [showToast]);
+  if (!profileRes.ok) {
+    throw new Error("Could not load student profile from the backend.");
+  }
 
-  return (
-    <div className="min-h-screen relative z-[1]">
-      <Navbar
-        activeTab={activeTab}
-        setActiveTab={handleTabChange}
-        scrolled={scrolled}
-        profileOpen={profileOpen}
-        setProfileOpen={setProfileOpen}
-        onLogout={handleLogout}
-      />
-      <BottomTabBar activeTab={activeTab} setActiveTab={handleTabChange} />
+  const profile: StudentProfile = await profileRes.json();
 
-      <main
-        className="max-w-7xl mx-auto px-4 md:px-8 pt-[88px] md:pt-[96px] pb-24 md:pb-16"
-        role="main"
-      >
-        <div key={tabKey}>
-          {activeTab === "lab" && (
-            <MathLabPage
-              selectedUnit={selectedUnit}
-              setSelectedUnit={setSelectedUnit}
-              onConceptClick={handleConceptClick}
-            />
-          )}
-          {activeTab === "notes" && (
-            <ShortNotesPage onReadMore={handleReadMore} />
-          )}
-          {activeTab === "engine" && <MathEnginePage />}
-        </div>
-      </main>
+  // Curriculum content is the same for every student in a grade and the
+  // endpoint requires no auth, so this fetch is cached and shared across
+  // every student in the grade rather than hitting the backend per user.
+  const unitsRes = await fetch(`${apiUrl}/api/units?grade=${profile.grade}`, {
+    next: { revalidate: 300, tags: ["units"] },
+  });
 
-      <ToastContainer toasts={toasts} />
-    </div>
-  );
+  if (!unitsRes.ok) {
+    throw new Error("Could not load units from the backend.");
+  }
+
+  const units: Unit[] = await unitsRes.json();
+
+  return <HomeClient profile={profile} units={units} />;
 }

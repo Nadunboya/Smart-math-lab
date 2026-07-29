@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Unit } from "../../lib/data";
+import { Unit } from "../../lib/types";
 import { UnitIcons, Icons } from "../../lib/icons";
 
 interface NoteCardProps {
@@ -11,7 +11,7 @@ interface NoteCardProps {
 }
 
 export default function NoteCard({ unit, index, onReadMore }: NoteCardProps) {
-  const IconComponent = UnitIcons[unit.iconKey];
+  const IconComponent = UnitIcons[unit.icon_key];
 
   return (
     <motion.div
@@ -28,37 +28,41 @@ export default function NoteCard({ unit, index, onReadMore }: NoteCardProps) {
       <div className="flex items-center gap-3 mb-4">
         <div
           className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
-          style={{ background: `${unit.accent}12` }}
+          style={{ background: `${unit.accent_color}12` }}
         >
-          {IconComponent && <IconComponent size={32} color={unit.accent} />}
+          {IconComponent && (
+            <IconComponent size={32} color={unit.accent_color} />
+          )}
         </div>
         <div>
           <h3 className="font-heading font-semibold text-sm text-white">
             {unit.name}
           </h3>
-          <p
-            className="text-[11px]"
-            style={{
-              fontFamily: '"Noto Sans Sinhala", sans-serif',
-              color: `${unit.accent}99`,
-            }}
-          >
-            {unit.sinhala}
-          </p>
+          {unit.sinhala_name && (
+            <p
+              className="text-[11px]"
+              style={{
+                fontFamily: '"Noto Sans Sinhala", sans-serif',
+                color: `${unit.accent_color}99`,
+              }}
+            >
+              {unit.sinhala_name}
+            </p>
+          )}
         </div>
       </div>
 
       <ul className="space-y-2.5 mb-5">
-        {unit.notes.map((note, ni) => (
+        {unit.short_notes.map((note) => (
           <li
-            key={ni}
+            key={note.id}
             className="flex items-start gap-2.5 text-sm text-white/55 leading-relaxed"
           >
             <span
               className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0"
-              style={{ background: unit.accent }}
+              style={{ background: unit.accent_color }}
             />
-            {note}
+            {note.content}
           </li>
         ))}
       </ul>
@@ -66,9 +70,9 @@ export default function NoteCard({ unit, index, onReadMore }: NoteCardProps) {
       <button
         onClick={onReadMore}
         className="flex items-center gap-1.5 text-sm font-medium transition-all hover:gap-2.5"
-        style={{ color: unit.accent }}
+        style={{ color: unit.accent_color }}
       >
-        Read Full Notes <Icons.arrowRight size={14} color={unit.accent} />
+        Read Full Notes <Icons.arrowRight size={14} color={unit.accent_color} />
       </button>
     </motion.div>
   );

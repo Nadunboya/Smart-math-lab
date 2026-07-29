@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { Icons } from "../lib/icons";
-import { Unit } from "../lib/data";
+import { StudentProfile } from "../lib/types";
 
 type TabKey = "lab" | "notes" | "engine";
 
@@ -13,6 +13,7 @@ interface NavbarProps {
   profileOpen: boolean;
   setProfileOpen: (open: boolean) => void;
   onLogout: () => void;
+  profile: StudentProfile;
 }
 
 const tabs: {
@@ -32,6 +33,7 @@ export default function Navbar({
   profileOpen,
   setProfileOpen,
   onLogout,
+  profile,
 }: NavbarProps) {
   return (
     <nav
@@ -84,7 +86,7 @@ export default function Navbar({
         <div className="flex items-center gap-3">
           {/* Grade Badge */}
           <span className="hidden md:inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-cyan/10 text-cyan border border-cyan/20">
-            Grade 6
+            Grade {profile.grade}
           </span>
 
           {/* Avatar */}
@@ -112,10 +114,10 @@ export default function Navbar({
                 >
                   <div className="px-4 py-3 border-b border-white/[0.06]">
                     <p className="font-heading font-semibold text-sm text-white">
-                      Kasun Perera
+                      {profile.student_name}
                     </p>
                     <p className="text-xs text-slate mt-0.5">
-                      Grade 6 — Mathematics
+                      Grade {profile.grade} — Mathematics
                     </p>
                   </div>
                   <div className="py-1.5">

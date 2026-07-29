@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Concept } from "../../lib/data";
+import { Concept } from "../../lib/types";
 import { Icons } from "../../lib/icons";
 
 interface ConceptCardProps {
@@ -45,7 +45,9 @@ export default function ConceptCard({
       <h4 className="font-heading font-semibold text-sm text-white mb-1">
         {concept.name}
       </h4>
-      <p className="text-xs text-white/45 leading-relaxed">{concept.desc}</p>
+      <p className="text-xs text-white/45 leading-relaxed">
+        {concept.description}
+      </p>
       <div
         className="mt-4 flex items-center gap-1.5 text-xs font-medium transition-colors group-hover:text-white"
         style={{ color: unitAccent }}
