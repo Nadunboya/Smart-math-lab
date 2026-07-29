@@ -18,7 +18,7 @@ create table if not exists public.teachers (
     phone text,
     bio text,
     grades integer[] not null default '{}'
-        check (grades <@ array(select generate_series(6, 11))),
+        check (grades <@ '{6,7,8,9,10,11}'::integer[]),
     onboarded boolean not null default false,
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now()
