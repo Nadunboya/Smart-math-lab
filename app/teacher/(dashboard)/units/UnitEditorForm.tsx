@@ -104,6 +104,7 @@ export default function UnitEditorForm({
         throw new Error(errBody?.detail ?? "Could not save the unit.");
       }
 
+      await fetch("/api/revalidate-units", { method: "POST" });
       router.replace("/teacher");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");

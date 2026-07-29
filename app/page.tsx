@@ -37,7 +37,7 @@ export default async function Page() {
   // endpoint requires no auth, so this fetch is cached and shared across
   // every student in the grade rather than hitting the backend per user.
   const unitsRes = await fetch(`${apiUrl}/api/units?grade=${profile.grade}`, {
-    next: { revalidate: 300 },
+    next: { revalidate: 300, tags: ["units"] },
   });
 
   if (!unitsRes.ok) {

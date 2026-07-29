@@ -46,6 +46,8 @@ export default function TeacherDashboardClient({
       headers: { Authorization: `Bearer ${session?.access_token}` },
     });
 
+    await fetch("/api/revalidate-units", { method: "POST" });
+
     setUnits((prev) => prev.filter((u) => u.id !== unitId));
     setDeletingId(null);
   };
