@@ -18,11 +18,18 @@ Run these against your Supabase project (SQL Editor), in order:
 
 1. `supabase_schema.sql` — the `students` table
 2. `supabase_content_schema.sql` — the `units` / `concepts` / `short_notes` tables
-3. `supabase_seed_grade6.sql` — seeds Grade 6 content (migrated from the
-   previous mock data). Grades 7 and up are intentionally left empty —
-   insert rows into `units` / `concepts` / `short_notes` with the right
-   `grade` once you have that curriculum content ready; no code changes
-   needed for a new grade to show up.
+3. `supabase_seed_grade6.sql` — seeds 21 real Grade 6 units (with full
+   Markdown lesson content per concept), sourced from the official Sri
+   Lankan Educational Publications Department textbook (Mathematics Grade
+   6, Parts I & II — freely distributed). Safe to re-run: it deletes
+   existing Grade 6 units first, then reinserts. Four syllabus chapters are
+   intentionally excluded (Circles, Angles, Rectilinear Plane Figures,
+   Solids) since their teaching method is hands-on/tool-based and doesn't
+   suit a text+diagram e-learning format — those stay in the physical
+   classroom. Grades 7 and up are intentionally left empty — insert rows
+   into `units` / `concepts` / `short_notes` with the right `grade` once
+   you have that curriculum content ready; no code changes needed for a
+   new grade to show up.
 4. `supabase_teachers_schema.sql` — the `teachers` table.
 5. `supabase_migrate_concept_body.sql` — adds the `body` (Markdown lesson
    content) column to `concepts`. Fresh installs don't need this — it's
