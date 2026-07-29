@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
-from .routers import content, students
+from .routers import content, students, teachers
 
 app = FastAPI(title="SmartMathLab API")
 
@@ -16,6 +16,7 @@ app.add_middleware(
 
 app.include_router(students.router)
 app.include_router(content.router)
+app.include_router(teachers.router)
 
 
 @app.get("/health")

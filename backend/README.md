@@ -23,9 +23,24 @@ Run these against your Supabase project (SQL Editor), in order:
    insert rows into `units` / `concepts` / `short_notes` with the right
    `grade` once you have that curriculum content ready; no code changes
    needed for a new grade to show up.
+4. `supabase_teachers_schema.sql` — the `teachers` table.
 
 Also enable the Google provider under Authentication > Providers, with your
 app's `/auth/callback` URL registered as an authorized redirect URI.
+
+### Inviting a teacher
+
+Teacher accounts are invite-only, not self-serve — anyone who signs in with
+Google defaults to the student flow unless their email was pre-provisioned:
+
+```sql
+insert into public.teachers (email) values ('teacher@example.com');
+```
+
+When that email signs in with Google, they're routed to `/teacher/onboarding`
+instead of the student onboarding form. Completing it claims the invite
+(links their Supabase auth user id) and grants access to `/teacher`, scoped
+to whichever grades they entered.
 
 ## Run
 
@@ -45,3 +60,15 @@ uvicorn app.main:app --reload --port 8000
   short notes) for that grade, ordered for display. No auth required —
   curriculum content is the same for every student in a grade, so this is
   cacheable and shared instead of being fetched per user.
+- `GET /api/units/{id}` — a single unit, same shape as above entry. No auth.
+- `POST /api/units`, `PUT /api/units/{id}`, `DELETE /api/units/{id}` —
+  create/update/delete a unit and its concepts/short notes. Requires a
+  bearer token belonging to an onboarded teacher whose `grades` include the
+  unit's grade; otherwise 403.
+- `GET /api/teachers/lookup` — used by the auth callback to tell whether a
+  signed-in email is an invited teacher at all (onboarded or not).
+- `POST /api/teachers/complete` — claims a teacher invite and saves
+  onboarding details. Body: `full_name`, `phone`, `bio` (optional),
+  `grades` (list of ints).
+- `GET /api/teachers/me` — the signed-in, onboarded teacher's profile, or
+  404.

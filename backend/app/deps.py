@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from fastapi import Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 
 from .supabase_client import supabase_admin
 
@@ -9,6 +9,13 @@ from .supabase_client import supabase_admin
 class CurrentUser:
     id: str
     email: str
+
+
+@dataclass
+class CurrentTeacher:
+    email: str
+    full_name: str | None
+    grades: list[int]
 
 
 def get_current_user(authorization: str | None = Header(default=None)) -> CurrentUser:
@@ -35,3 +42,31 @@ def get_current_user(authorization: str | None = Header(default=None)) -> Curren
         )
 
     return CurrentUser(id=user.id, email=user.email)
+
+
+def get_current_teacher(user: CurrentUser = Depends(get_current_user)) -> CurrentTeacher:
+    result = (
+        supabase_admin.table("teachers")
+        .select("*")
+        .eq("id", user.id)
+        .eq("onboarded", True)
+        .limit(1)
+        .execute()
+    )
+
+    if not result.data:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not an onboarded teacher account",
+        )
+
+    row = result.data[0]
+    return CurrentTeacher(email=row["email"], full_name=row["full_name"], grades=row["grades"])
+
+
+def require_grade_access(grade: int, teacher: CurrentTeacher) -> None:
+    if grade not in teacher.grades:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"You are not assigned to grade {grade}",
+        )

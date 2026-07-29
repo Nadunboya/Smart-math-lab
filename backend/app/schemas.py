@@ -59,5 +59,52 @@ class UnitOut(BaseModel):
     accent_color: str
     icon_key: str
     description: str
+    sort_order: int
     concepts: list[ConceptOut]
     short_notes: list[ShortNoteOut]
+
+
+class ConceptIn(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    description: str = Field(min_length=1, max_length=2000)
+    sort_order: int = 0
+
+
+class ShortNoteIn(BaseModel):
+    content: str = Field(min_length=1, max_length=2000)
+    sort_order: int = 0
+
+
+class UnitIn(BaseModel):
+    grade: int = Field(ge=1, le=13)
+    name: str = Field(min_length=1, max_length=200)
+    sinhala_name: str | None = Field(default=None, max_length=200)
+    accent_color: str = Field(default="#5B4FE5", max_length=20)
+    icon_key: str = Field(min_length=1, max_length=50)
+    description: str = Field(min_length=1, max_length=2000)
+    sort_order: int = 0
+    concepts: list[ConceptIn] = Field(default_factory=list)
+    short_notes: list[ShortNoteIn] = Field(default_factory=list)
+
+
+class TeacherOnboardingIn(BaseModel):
+    full_name: str = Field(min_length=1, max_length=200)
+    phone: str = Field(min_length=1, max_length=30)
+    bio: str | None = Field(default=None, max_length=1000)
+    grades: list[int] = Field(min_length=1)
+
+    @field_validator("grades")
+    @classmethod
+    def grades_in_range(cls, value: list[int]) -> list[int]:
+        if any(g < 1 or g > 13 for g in value):
+            raise ValueError("grades must be between 1 and 13")
+        return sorted(set(value))
+
+
+class TeacherOut(BaseModel):
+    email: str
+    full_name: str | None
+    phone: str | None
+    bio: str | None
+    grades: list[int]
+    onboarded: bool

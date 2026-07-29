@@ -29,6 +29,16 @@ export interface Unit {
   accent_color: string;
   icon_key: string;
   description: string;
+  sort_order: number;
   concepts: Concept[];
   short_notes: ShortNote[];
+}
+
+export interface TeacherProfile {
+  email: string;
+  full_name: string | null;
+  phone: string | null;
+  bio: string | null;
+  grades: number[];
+  onboarded: boolean;
 }

@@ -3,6 +3,10 @@ import { type NextRequest, NextResponse } from "next/server";
 
 const PROTECTED_PATHS = ["/", "/onboarding"];
 
+function isProtected(pathname: string): boolean {
+  return PROTECTED_PATHS.includes(pathname) || pathname.startsWith("/teacher");
+}
+
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -40,7 +44,7 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  if (!user && PROTECTED_PATHS.includes(pathname)) {
+  if (!user && isProtected(pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
