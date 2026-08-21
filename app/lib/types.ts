@@ -35,6 +35,22 @@ export interface Unit {
   short_notes: ShortNote[];
 }
 
+export interface NextQuestion {
+  question_id: string;
+  unit_id: string;
+  subtopic: string | null;
+  difficulty: "easy" | "medium" | "hard";
+  prompt: string;
+}
+
+export interface AnswerResult {
+  correct: boolean;
+  attempts: number;
+  hints_released: number;
+  hint: string | null;
+  solution_steps: string[] | null;
+}
+
 export interface TeacherProfile {
   email: string;
   full_name: string | null;

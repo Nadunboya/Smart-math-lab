@@ -107,7 +107,7 @@ export default function HomeClient({
           {activeTab === "notes" && (
             <ShortNotesPage units={units} onReadMore={handleReadMore} />
           )}
-          {activeTab === "engine" && <MathEnginePage />}
+          {activeTab === "engine" && <MathEnginePage profile={profile} />}
         </div>
       </main>
 
