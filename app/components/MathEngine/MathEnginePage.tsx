@@ -7,6 +7,7 @@ import { Icons } from "../../lib/icons";
 import { createClient } from "../../../lib/supabase/client";
 import {
   AnswerResult,
+  HeartsInfo,
   NextQuestion,
   PassResult,
   StudentProfile,
@@ -18,7 +19,16 @@ const DIFFICULTY_COLOR: Record<string, string> = {
   hard: "#8B5CF6",
 };
 
+const HEARTS_POLL_MS = 60_000;
+
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
+function formatCountdown(msRemaining: number): string {
+  const totalSeconds = Math.max(0, Math.ceil(msRemaining / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
 
 export default function MathEnginePage({ profile }: { profile: StudentProfile }) {
   const router = useRouter();
@@ -29,9 +39,10 @@ export default function MathEnginePage({ profile }: { profile: StudentProfile })
   const [answer, setAnswer] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<AnswerResult | null>(null);
-  const [heartsRemaining, setHeartsRemaining] = useState(0);
+  const [hearts, setHearts] = useState<HeartsInfo | null>(null);
   const [passing, setPassing] = useState(false);
   const [passedSteps, setPassedSteps] = useState<string[] | null>(null);
+  const [now, setNow] = useState(() => Date.now());
 
   const authHeaders = useCallback(async () => {
     const supabase = createClient();
@@ -46,6 +57,23 @@ export default function MathEnginePage({ profile }: { profile: StudentProfile })
 
     return { Authorization: `Bearer ${session.access_token}` };
   }, [router]);
+
+  const loadHearts = useCallback(async () => {
+    const headers = await authHeaders();
+    if (!headers) return;
+
+    try {
+      const res = await fetch(`${apiUrl}/api/math-engine/hearts`, {
+        headers,
+        cache: "no-store",
+      });
+      if (res.ok) {
+        setHearts(await res.json());
+      }
+    } catch {
+      // Non-critical — the hearts row just won't update this tick.
+    }
+  }, [authHeaders]);
 
   const loadNextQuestion = useCallback(async () => {
     setLoading(true);
@@ -73,10 +101,8 @@ export default function MathEnginePage({ profile }: { profile: StudentProfile })
         throw new Error("Could not load the next question.");
       }
 
-      const next: NextQuestion = await res.json();
       setDone(false);
-      setQuestion(next);
-      setHeartsRemaining(next.hearts_total);
+      setQuestion(await res.json());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
@@ -86,9 +112,23 @@ export default function MathEnginePage({ profile }: { profile: StudentProfile })
 
   useEffect(() => {
     (async () => {
-      await loadNextQuestion();
+      await Promise.all([loadHearts(), loadNextQuestion()]);
     })();
-  }, [loadNextQuestion]);
+  }, [loadHearts, loadNextQuestion]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNow(Date.now());
+      loadHearts();
+    }, HEARTS_POLL_MS);
+    return () => clearInterval(interval);
+  }, [loadHearts]);
+
+  useEffect(() => {
+    if (!hearts?.next_refill_at) return;
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [hearts?.next_refill_at]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -114,9 +154,7 @@ export default function MathEnginePage({ profile }: { profile: StudentProfile })
         throw new Error("Could not check that answer.");
       }
 
-      const data: AnswerResult = await res.json();
-      setResult(data);
-      setHeartsRemaining(data.hearts_remaining);
+      setResult(await res.json());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
@@ -125,7 +163,7 @@ export default function MathEnginePage({ profile }: { profile: StudentProfile })
   };
 
   const handlePass = async () => {
-    if (!question || passing) return;
+    if (!question || passing || !hearts || hearts.hearts_remaining <= 0) return;
 
     setPassing(true);
     setError(null);
@@ -140,12 +178,24 @@ export default function MathEnginePage({ profile }: { profile: StudentProfile })
         body: JSON.stringify({ question_id: question.question_id }),
       });
 
+      if (res.status === 429) {
+        throw new Error("No hearts left right now.");
+      }
       if (!res.ok) {
-        throw new Error("Could not pass this question.");
+        throw new Error("Could not reveal the answer.");
       }
 
       const data: PassResult = await res.json();
       setPassedSteps(data.solution_steps);
+      setHearts((prev) =>
+        prev
+          ? {
+              ...prev,
+              hearts_remaining: data.hearts_remaining,
+              next_refill_at: data.next_refill_at,
+            }
+          : prev,
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
@@ -184,19 +234,47 @@ export default function MathEnginePage({ profile }: { profile: StudentProfile })
   }
 
   const finished = result?.correct || passedSteps !== null;
+  const outOfHearts = hearts !== null && hearts.hearts_remaining <= 0;
+  const countdown =
+    hearts?.next_refill_at != null
+      ? formatCountdown(new Date(hearts.next_refill_at).getTime() - now)
+      : null;
 
   return (
     <div className="max-w-2xl mx-auto py-6 md:py-10">
-      <div className="flex items-center gap-2.5 mb-6">
-        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cosmic to-nebula flex items-center justify-center">
-          <Icons.spark size={16} color="#fff" />
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cosmic to-nebula flex items-center justify-center">
+            <Icons.spark size={16} color="#fff" />
+          </div>
+          <div>
+            <h2 className="font-heading font-bold text-lg text-white">
+              AI Math Engine
+            </h2>
+            <p className="text-xs text-white/40">Grade {profile.grade} practice</p>
+          </div>
         </div>
-        <div>
-          <h2 className="font-heading font-bold text-lg text-white">
-            AI Math Engine
-          </h2>
-          <p className="text-xs text-white/40">Grade {profile.grade} practice</p>
-        </div>
+
+        {hearts && (
+          <div className="flex flex-col items-end gap-1">
+            <div
+              className="flex items-center gap-1"
+              aria-label={`${hearts.hearts_remaining} of ${hearts.hearts_max} hearts remaining`}
+            >
+              {Array.from({ length: hearts.hearts_max }).map((_, i) => (
+                <Icons.heart
+                  key={i}
+                  size={16}
+                  filled={i < hearts.hearts_remaining}
+                  color={i < hearts.hearts_remaining ? "#FF4D6D" : "rgba(255,255,255,0.18)"}
+                />
+              ))}
+            </div>
+            {countdown && (
+              <p className="text-[10px] text-white/35">next heart in {countdown}</p>
+            )}
+          </div>
+        )}
       </div>
 
       {error && (
@@ -213,34 +291,21 @@ export default function MathEnginePage({ profile }: { profile: StudentProfile })
           transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
           className="bg-card-navy border border-white/[0.06] rounded-3xl p-6 md:p-8 shadow-card-dark"
         >
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <span
-                className="text-[11px] font-semibold px-2.5 py-1 rounded-full capitalize"
-                style={{
-                  color: DIFFICULTY_COLOR[question.difficulty] ?? "#00D9C0",
-                  background: `${DIFFICULTY_COLOR[question.difficulty] ?? "#00D9C0"}18`,
-                }}
-              >
-                {question.difficulty}
+          <div className="flex items-center gap-2 mb-4">
+            <span
+              className="text-[11px] font-semibold px-2.5 py-1 rounded-full capitalize"
+              style={{
+                color: DIFFICULTY_COLOR[question.difficulty] ?? "#00D9C0",
+                background: `${DIFFICULTY_COLOR[question.difficulty] ?? "#00D9C0"}18`,
+              }}
+            >
+              {question.difficulty}
+            </span>
+            {question.subtopic && (
+              <span className="text-[11px] text-white/35">
+                {question.subtopic}
               </span>
-              {question.subtopic && (
-                <span className="text-[11px] text-white/35">
-                  {question.subtopic}
-                </span>
-              )}
-            </div>
-
-            <div className="flex items-center gap-1" aria-label={`${heartsRemaining} of ${question.hearts_total} hearts remaining`}>
-              {Array.from({ length: question.hearts_total }).map((_, i) => (
-                <Icons.heart
-                  key={i}
-                  size={16}
-                  filled={i < heartsRemaining}
-                  color={i < heartsRemaining ? "#FF4D6D" : "rgba(255,255,255,0.18)"}
-                />
-              ))}
-            </div>
+            )}
           </div>
 
           <p className="font-heading text-base md:text-lg text-white leading-relaxed mb-6">
@@ -264,16 +329,19 @@ export default function MathEnginePage({ profile }: { profile: StudentProfile })
               >
                 {submitting ? "Checking…" : "Check answer"}
               </button>
-              {heartsRemaining === 0 && (
-                <button
-                  type="button"
-                  onClick={handlePass}
-                  disabled={passing}
-                  className="w-full rounded-xl border border-white/[0.1] text-white/60 font-medium text-sm py-3 hover:bg-white/[0.04] transition-colors disabled:opacity-60"
-                >
-                  {passing ? "Passing…" : "Out of hearts — pass this question"}
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={handlePass}
+                disabled={passing || outOfHearts}
+                className="w-full flex items-center justify-center gap-1.5 rounded-xl border border-white/[0.1] text-white/60 font-medium text-sm py-3 hover:bg-white/[0.04] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Icons.heart size={14} color="#FF4D6D" />
+                {passing
+                  ? "Revealing…"
+                  : outOfHearts
+                    ? `No hearts left${countdown ? ` — next in ${countdown}` : ""}`
+                    : "Reveal answer (-1 heart)"}
+              </button>
             </form>
           )}
 
@@ -291,7 +359,7 @@ export default function MathEnginePage({ profile }: { profile: StudentProfile })
                 </p>
                 <p className="text-sm text-white/70">
                   {result.hint ??
-                    "No hints left — try again, or pass this one."}
+                    "No hints left — try again, or reveal the answer."}
                 </p>
               </motion.div>
             )}

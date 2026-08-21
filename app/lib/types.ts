@@ -41,21 +41,27 @@ export interface NextQuestion {
   subtopic: string | null;
   difficulty: "easy" | "medium" | "hard";
   prompt: string;
-  hearts_total: number;
 }
 
 export interface AnswerResult {
   correct: boolean;
   attempts: number;
   hints_released: number;
-  hearts_remaining: number;
   hint: string | null;
   solution_steps: string[] | null;
+}
+
+export interface HeartsInfo {
+  hearts_remaining: number;
+  hearts_max: number;
+  next_refill_at: string | null;
 }
 
 export interface PassResult {
   passed: boolean;
   solution_steps: string[];
+  hearts_remaining: number;
+  next_refill_at: string | null;
 }
 
 export interface TeacherProfile {
