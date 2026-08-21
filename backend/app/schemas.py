@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -89,6 +90,30 @@ class UnitIn(BaseModel):
     sort_order: int = 0
     concepts: list[ConceptIn] = Field(default_factory=list)
     short_notes: list[ShortNoteIn] = Field(default_factory=list)
+
+
+class MathEngineAskIn(BaseModel):
+    question: str = Field(min_length=1, max_length=2000)
+    grade: int = Field(ge=MIN_GRADE, le=MAX_GRADE)
+    mode: Literal["step_by_step", "hint", "concept"] = "step_by_step"
+
+    @field_validator("question")
+    @classmethod
+    def not_blank(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("must not be blank")
+        return stripped
+
+
+class MathEngineSource(BaseModel):
+    unit_name: str
+    concept_name: str
+
+
+class MathEngineAskOut(BaseModel):
+    answer: str
+    sources: list[MathEngineSource]
 
 
 class TeacherOnboardingIn(BaseModel):

@@ -11,8 +11,11 @@ cd backend
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env   # fill in SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY
+cp .env.example .env   # fill in SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and GEMINI_API_KEY
 ```
+
+`GEMINI_API_KEY` powers the Math Engine RAG agent (see below) — get a free-tier
+key at https://aistudio.google.com/apikey.
 
 Run these against your Supabase project (SQL Editor), in order:
 
@@ -34,6 +37,9 @@ Run these against your Supabase project (SQL Editor), in order:
 5. `supabase_migrate_concept_body.sql` — adds the `body` (Markdown lesson
    content) column to `concepts`. Fresh installs don't need this — it's
    already in `supabase_content_schema.sql`.
+6. `supabase_migrate_math_engine_search.sql` — adds the full-text search
+   column/indexes the Math Engine's retrieval step queries (see below).
+   Safe to re-run.
 
 Supported grades are 6-11 (`MIN_GRADE`/`MAX_GRADE` in `app/constants.py`). If
 you already ran `supabase_schema.sql` / `supabase_content_schema.sql` before
@@ -89,3 +95,13 @@ uvicorn app.main:app --reload --port 8000
   `grades` (list of ints).
 - `GET /api/teachers/me` — the signed-in, onboarded teacher's profile, or
   404.
+- `POST /api/math-engine/ask` — the AI Math Engine's RAG agent. Body:
+  `question`, `grade` (6-11), `mode` (`step_by_step` | `hint` | `concept`,
+  defaults to `step_by_step`). Retrieves the most relevant `concepts` and
+  `short_notes` for that grade via Postgres full-text search (no embeddings —
+  zero extra cost beyond the free-tier Gemini call), then asks Gemini
+  (`GEMINI_MODEL`, default `gemini-2.5-flash`) to answer grounded in that
+  content. Returns `answer` plus `sources` (the unit/concept names used as
+  context). No auth required — same rationale as `GET /api/units`: the
+  curriculum is shared, not per-student. Returns 502 if Gemini is unreachable
+  or replies empty.
