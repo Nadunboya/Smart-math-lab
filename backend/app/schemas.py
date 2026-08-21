@@ -98,7 +98,6 @@ class NextQuestionOut(BaseModel):
     subtopic: str | None
     difficulty: str
     prompt: str
-    hearts_total: int
 
 
 class AnswerIn(BaseModel):
@@ -110,9 +109,14 @@ class AnswerOut(BaseModel):
     correct: bool
     attempts: int
     hints_released: int
-    hearts_remaining: int
     hint: str | None
     solution_steps: list[str] | None
+
+
+class HeartsOut(BaseModel):
+    hearts_remaining: int
+    hearts_max: int
+    next_refill_at: datetime | None
 
 
 class PassIn(BaseModel):
@@ -122,6 +126,8 @@ class PassIn(BaseModel):
 class PassOut(BaseModel):
     passed: bool
     solution_steps: list[str]
+    hearts_remaining: int
+    next_refill_at: datetime | None
 
 
 class MathEngineAskIn(BaseModel):

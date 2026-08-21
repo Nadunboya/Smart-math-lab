@@ -1,5 +1,5 @@
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from google import genai
@@ -11,6 +11,7 @@ from ..deps import CurrentUser, get_current_user
 from ..schemas import (
     AnswerIn,
     AnswerOut,
+    HeartsOut,
     MathEngineAskIn,
     MathEngineAskOut,
     MathEngineSource,
@@ -26,6 +27,75 @@ _gemini_client = genai.Client(api_key=settings.gemini_api_key)
 
 _TOP_K = 5
 _DIFFICULTY_ORDER = {"easy": 0, "medium": 1, "hard": 2}
+
+# Global "hearts" (lives), shared across all practice — not per-question.
+# Burning one is an explicit "reveal the answer" action (POST /pass), never
+# an automatic cost of a wrong answer. Regeneration is computed lazily
+# whenever hearts are read or burned, rather than via a background job.
+_HEART_CAP = 5
+_HEART_REFILL_MINUTES = 30
+
+
+def _get_hearts(student_id: str) -> tuple[int, datetime]:
+    """Returns (hearts_remaining, last_regen_at) after settling any regeneration due."""
+    result = execute_with_retry(
+        lambda: supabase_admin.table("student_hearts").select("*").eq("student_id", student_id).limit(1)
+    )
+    now = datetime.now(timezone.utc)
+
+    if not result.data:
+        execute_with_retry(
+            lambda: supabase_admin.table("student_hearts").upsert(
+                {"student_id": student_id, "hearts_remaining": _HEART_CAP, "last_regen_at": now.isoformat()}
+            )
+        )
+        return _HEART_CAP, now
+
+    row = result.data[0]
+    hearts = row["hearts_remaining"]
+    last_regen_at = datetime.fromisoformat(row["last_regen_at"])
+
+    if hearts >= _HEART_CAP:
+        return hearts, last_regen_at
+
+    elapsed_minutes = (now - last_regen_at).total_seconds() / 60
+    regenerated = int(elapsed_minutes // _HEART_REFILL_MINUTES)
+    if regenerated <= 0:
+        return hearts, last_regen_at
+
+    hearts = min(_HEART_CAP, hearts + regenerated)
+    last_regen_at = now if hearts >= _HEART_CAP else last_regen_at + timedelta(minutes=regenerated * _HEART_REFILL_MINUTES)
+
+    execute_with_retry(
+        lambda: supabase_admin.table("student_hearts")
+        .update({"hearts_remaining": hearts, "last_regen_at": last_regen_at.isoformat()})
+        .eq("student_id", student_id)
+    )
+    return hearts, last_regen_at
+
+
+def _next_refill_at(hearts_remaining: int, last_regen_at: datetime) -> datetime | None:
+    if hearts_remaining >= _HEART_CAP:
+        return None
+    return last_regen_at + timedelta(minutes=_HEART_REFILL_MINUTES)
+
+
+def _burn_heart(student_id: str) -> tuple[int, datetime | None]:
+    hearts, last_regen_at = _get_hearts(student_id)
+    if hearts <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="No hearts left — they refill over time",
+        )
+
+    hearts -= 1
+    execute_with_retry(
+        lambda: supabase_admin.table("student_hearts")
+        .update({"hearts_remaining": hearts})
+        .eq("student_id", student_id)
+    )
+    return hearts, _next_refill_at(hearts, last_regen_at)
+
 
 _MODE_INSTRUCTIONS = {
     "step_by_step": (
@@ -154,6 +224,16 @@ def _grade_answer(question: dict, student_answer: str) -> bool:
     return False
 
 
+@router.get("/hearts", response_model=HeartsOut)
+def get_hearts(user: CurrentUser = Depends(get_current_user)) -> HeartsOut:
+    hearts, last_regen_at = _get_hearts(user.id)
+    return HeartsOut(
+        hearts_remaining=hearts,
+        hearts_max=_HEART_CAP,
+        next_refill_at=_next_refill_at(hearts, last_regen_at),
+    )
+
+
 @router.get("/next-question", response_model=NextQuestionOut)
 def next_question(
     grade: int = Query(ge=MIN_GRADE, le=MAX_GRADE),
@@ -186,8 +266,7 @@ def next_question(
             detail="No more questions available for this grade/unit",
         )
 
-    chosen = candidates[0]
-    return NextQuestionOut(**chosen, hearts_total=len(chosen["hints"]))
+    return NextQuestionOut(**candidates[0])
 
 
 @router.post("/answer", response_model=AnswerOut)
@@ -216,10 +295,9 @@ def submit_answer(payload: AnswerIn, user: CurrentUser = Depends(get_current_use
 
     correct = _grade_answer(question, payload.student_answer)
     solved = solved or correct
-    hearts_total = len(question["hints"])
 
     hint = None
-    if not correct and hints_released < hearts_total:
+    if not correct and hints_released < len(question["hints"]):
         hint = question["hints"][hints_released]
         hints_released += 1
 
@@ -242,7 +320,6 @@ def submit_answer(payload: AnswerIn, user: CurrentUser = Depends(get_current_use
         correct=correct,
         attempts=attempts,
         hints_released=hints_released,
-        hearts_remaining=max(0, hearts_total - hints_released),
         hint=hint,
         solution_steps=question["solution_steps"] if correct else None,
     )
@@ -260,6 +337,8 @@ def pass_question(payload: PassIn, user: CurrentUser = Depends(get_current_user)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
     question = question_result.data[0]
 
+    hearts_remaining, next_refill_at = _burn_heart(user.id)
+
     session_result = execute_with_retry(
         lambda: supabase_admin.table("tutor_sessions")
         .select("*")
@@ -268,13 +347,6 @@ def pass_question(payload: PassIn, user: CurrentUser = Depends(get_current_user)
         .limit(1)
     )
     session = session_result.data[0] if session_result.data else None
-    hints_released = session["hints_released"] if session else 0
-
-    if hints_released < len(question["hints"]):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="You still have hearts left on this question",
-        )
 
     execute_with_retry(
         lambda: supabase_admin.table("tutor_sessions").upsert(
@@ -283,7 +355,7 @@ def pass_question(payload: PassIn, user: CurrentUser = Depends(get_current_user)
                 "unit_id": question["unit_id"],
                 "question_id": payload.question_id,
                 "attempts": session["attempts"] if session else 0,
-                "hints_released": hints_released,
+                "hints_released": session["hints_released"] if session else 0,
                 "solved": session["solved"] if session else False,
                 "passed": True,
                 "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -292,4 +364,9 @@ def pass_question(payload: PassIn, user: CurrentUser = Depends(get_current_user)
         )
     )
 
-    return PassOut(passed=True, solution_steps=question["solution_steps"])
+    return PassOut(
+        passed=True,
+        solution_steps=question["solution_steps"],
+        hearts_remaining=hearts_remaining,
+        next_refill_at=next_refill_at,
+    )
