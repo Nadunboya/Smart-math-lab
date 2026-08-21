@@ -15,6 +15,8 @@ from ..schemas import (
     MathEngineAskOut,
     MathEngineSource,
     NextQuestionOut,
+    PassIn,
+    PassOut,
 )
 from ..supabase_client import execute_with_retry, supabase_admin
 
@@ -158,13 +160,13 @@ def next_question(
     unit_id: str | None = None,
     user: CurrentUser = Depends(get_current_user),
 ) -> NextQuestionOut:
-    solved_result = execute_with_retry(
+    done_result = execute_with_retry(
         lambda: supabase_admin.table("tutor_sessions")
         .select("question_id")
         .eq("student_id", user.id)
-        .eq("solved", True)
+        .or_("solved.eq.true,passed.eq.true")
     )
-    solved_ids = {row["question_id"] for row in solved_result.data}
+    done_ids = {row["question_id"] for row in done_result.data}
 
     def _build_questions_query():
         query = supabase_admin.table("questions").select("*").eq("grade", grade)
@@ -175,7 +177,7 @@ def next_question(
     questions = execute_with_retry(_build_questions_query).data
 
     candidates = sorted(
-        (q for q in questions if q["question_id"] not in solved_ids),
+        (q for q in questions if q["question_id"] not in done_ids),
         key=lambda q: (_DIFFICULTY_ORDER.get(q["difficulty"], 99), q["question_id"]),
     )
     if not candidates:
@@ -184,7 +186,8 @@ def next_question(
             detail="No more questions available for this grade/unit",
         )
 
-    return NextQuestionOut(**candidates[0])
+    chosen = candidates[0]
+    return NextQuestionOut(**chosen, hearts_total=len(chosen["hints"]))
 
 
 @router.post("/answer", response_model=AnswerOut)
@@ -213,9 +216,10 @@ def submit_answer(payload: AnswerIn, user: CurrentUser = Depends(get_current_use
 
     correct = _grade_answer(question, payload.student_answer)
     solved = solved or correct
+    hearts_total = len(question["hints"])
 
     hint = None
-    if not correct and hints_released < len(question["hints"]):
+    if not correct and hints_released < hearts_total:
         hint = question["hints"][hints_released]
         hints_released += 1
 
@@ -238,6 +242,54 @@ def submit_answer(payload: AnswerIn, user: CurrentUser = Depends(get_current_use
         correct=correct,
         attempts=attempts,
         hints_released=hints_released,
+        hearts_remaining=max(0, hearts_total - hints_released),
         hint=hint,
         solution_steps=question["solution_steps"] if correct else None,
     )
+
+
+@router.post("/pass", response_model=PassOut)
+def pass_question(payload: PassIn, user: CurrentUser = Depends(get_current_user)) -> PassOut:
+    question_result = execute_with_retry(
+        lambda: supabase_admin.table("questions")
+        .select("*")
+        .eq("question_id", payload.question_id)
+        .limit(1)
+    )
+    if not question_result.data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
+    question = question_result.data[0]
+
+    session_result = execute_with_retry(
+        lambda: supabase_admin.table("tutor_sessions")
+        .select("*")
+        .eq("student_id", user.id)
+        .eq("question_id", payload.question_id)
+        .limit(1)
+    )
+    session = session_result.data[0] if session_result.data else None
+    hints_released = session["hints_released"] if session else 0
+
+    if hints_released < len(question["hints"]):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You still have hearts left on this question",
+        )
+
+    execute_with_retry(
+        lambda: supabase_admin.table("tutor_sessions").upsert(
+            {
+                "student_id": user.id,
+                "unit_id": question["unit_id"],
+                "question_id": payload.question_id,
+                "attempts": session["attempts"] if session else 0,
+                "hints_released": hints_released,
+                "solved": session["solved"] if session else False,
+                "passed": True,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            },
+            on_conflict="student_id,question_id",
+        )
+    )
+
+    return PassOut(passed=True, solution_steps=question["solution_steps"])

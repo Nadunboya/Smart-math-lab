@@ -50,6 +50,8 @@ Run these against your Supabase project (SQL Editor), in order:
    to `uuid` (matching `auth.users`/`students.id` instead of the `text` it
    was created with) and adds the FKs/unique index the practice loop needs.
    Run this only once, before `tutor_sessions` has any rows.
+10. `supabase_migrate_tutor_sessions_passed.sql` — adds `tutor_sessions.passed`,
+    the gamified "hearts" system's skip flag (see below). Safe to re-run.
 
 ### Ingesting a Math Engine corpus
 
@@ -135,15 +137,27 @@ uvicorn app.main:app --reload --port 8000
 - `GET /api/math-engine/next-question?grade=N&unit_id=` — the practice loop:
   the engine picks a question, not the other way around. Returns the next
   question (from the `questions` table, ingested from a corpus — see above)
-  for that grade/unit that this student hasn't solved yet, ordered easiest
-  first. Never includes `answer`/`solution_steps`/`hints`. Requires a bearer
-  token (progress is per-student). 404 once nothing is left to answer.
+  for that grade/unit that this student hasn't solved *or passed* yet,
+  ordered easiest first. Includes `hearts_total` (= that question's hint
+  count) so the frontend knows how many hearts to render before the first
+  attempt. Never includes `answer`/`solution_steps`/`hints`. Requires a
+  bearer token (progress is per-student). 404 once nothing is left.
 - `POST /api/math-engine/answer` — body: `question_id`, `student_answer`.
   Grades by exact/normalized match against the question's `answer` and
   `accepted_variants` (case/whitespace-insensitive; numeric questions also
   get a float-equality fallback). Upserts `tutor_sessions` (one row per
   student+question) to track `attempts`/`hints_released`/`solved`. On a
-  wrong answer, releases the corpus's next pre-written hint (no LLM call —
-  the corpus already ships exactly 3 hints per question, ordered from a
-  conceptual nudge to nearly-there); once solved, returns the full
-  `solution_steps` instead. Requires a bearer token.
+  wrong answer, releases the corpus's next pre-written hint and burns one
+  heart — `hearts_remaining` in the response counts down from
+  `hearts_total` (no LLM call for hints — the corpus already ships exactly
+  3 per question, ordered from a conceptual nudge to nearly-there); once
+  solved, returns the full `solution_steps` instead. Requires a bearer
+  token.
+- `POST /api/math-engine/pass` — body: `question_id`. Gamified escape hatch:
+  once `hearts_remaining` hits 0 on a question (all hints exhausted, still
+  wrong), the student can pass instead of being stuck forever. Marks that
+  question `passed` in `tutor_sessions` (excluded from future
+  `next-question` calls, same as solved) and returns `solution_steps` so
+  they still see the method. 400 if hearts aren't actually exhausted yet —
+  this endpoint can't be used to skip a question early. Requires a bearer
+  token.
