@@ -22,12 +22,14 @@ import argparse
 import json
 import re
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from google import genai  # noqa: E402
 from google.genai import types  # noqa: E402
+from google.genai.errors import APIError  # noqa: E402
 
 from app.config import settings  # noqa: E402
 from app.supabase_client import supabase_admin  # noqa: E402
@@ -68,19 +70,48 @@ def _parse_chunk_meta(raw: str) -> dict[str, str]:
     return meta
 
 
+def _retry_delay_seconds(exc: APIError, default: float = 30.0) -> float:
+    details = getattr(exc, "details", None) or {}
+    error = details.get("error", {}) if isinstance(details, dict) else {}
+    for item in error.get("details", []):
+        if str(item.get("@type", "")).endswith("RetryInfo"):
+            delay = str(item.get("retryDelay", ""))
+            if delay.endswith("s"):
+                try:
+                    return float(delay[:-1])
+                except ValueError:
+                    pass
+    return default
+
+
+def _embed_batch(batch: list[str], max_retries: int = 5) -> list[list[float]]:
+    for attempt in range(max_retries):
+        try:
+            response = _gemini_client.models.embed_content(
+                model=EMBEDDING_MODEL,
+                contents=batch,
+                config=types.EmbedContentConfig(
+                    output_dimensionality=EMBEDDING_DIMENSIONS,
+                    task_type="RETRIEVAL_DOCUMENT",
+                ),
+            )
+            return [embedding.values for embedding in response.embeddings]
+        except APIError as exc:
+            if exc.code == 429 and attempt < max_retries - 1:
+                delay = _retry_delay_seconds(exc)
+                print(f"  rate limited, waiting {delay:.0f}s (attempt {attempt + 1}/{max_retries})...")
+                time.sleep(delay)
+                continue
+            raise
+
+
 def _embed_texts(texts: list[str]) -> list[list[float]]:
     embeddings: list[list[float]] = []
     for start in range(0, len(texts), EMBEDDING_BATCH_SIZE):
         batch = texts[start : start + EMBEDDING_BATCH_SIZE]
-        response = _gemini_client.models.embed_content(
-            model=EMBEDDING_MODEL,
-            contents=batch,
-            config=types.EmbedContentConfig(
-                output_dimensionality=EMBEDDING_DIMENSIONS,
-                task_type="RETRIEVAL_DOCUMENT",
-            ),
-        )
-        embeddings.extend(embedding.values for embedding in response.embeddings)
+        embeddings.extend(_embed_batch(batch))
+        if start + EMBEDDING_BATCH_SIZE < len(texts):
+            time.sleep(2)  # stay well clear of the free-tier per-minute quota
     return embeddings
 
 
