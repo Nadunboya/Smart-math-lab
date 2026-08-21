@@ -92,6 +92,27 @@ class UnitIn(BaseModel):
     short_notes: list[ShortNoteIn] = Field(default_factory=list)
 
 
+class NextQuestionOut(BaseModel):
+    question_id: str
+    unit_id: str
+    subtopic: str | None
+    difficulty: str
+    prompt: str
+
+
+class AnswerIn(BaseModel):
+    question_id: str = Field(min_length=1, max_length=100)
+    student_answer: str = Field(min_length=1, max_length=500)
+
+
+class AnswerOut(BaseModel):
+    correct: bool
+    attempts: int
+    hints_released: int
+    hint: str | None
+    solution_steps: list[str] | None
+
+
 class MathEngineAskIn(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
     grade: int = Field(ge=MIN_GRADE, le=MAX_GRADE)

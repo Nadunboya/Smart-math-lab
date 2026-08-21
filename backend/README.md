@@ -38,8 +38,35 @@ Run these against your Supabase project (SQL Editor), in order:
    content) column to `concepts`. Fresh installs don't need this — it's
    already in `supabase_content_schema.sql`.
 6. `supabase_migrate_math_engine_search.sql` — adds the full-text search
-   column/indexes the Math Engine's retrieval step queries (see below).
-   Safe to re-run.
+   column/indexes the `POST /api/math-engine/ask` retrieval step queries
+   (see below). Safe to re-run.
+7. The `concept_chunks` / `match_concept_chunks` / `tutor_sessions` SQL you
+   already have for the pgvector RAG corpus.
+8. `supabase_questions_schema.sql` — the `questions` table: the Math
+   Engine's practice question bank (engine poses a question, student
+   answers). Populated by `scripts/ingest_math_engine_corpus.py`, not
+   hand-authored.
+9. `supabase_migrate_tutor_sessions.sql` — fixes `tutor_sessions.student_id`
+   to `uuid` (matching `auth.users`/`students.id` instead of the `text` it
+   was created with) and adds the FKs/unique index the practice loop needs.
+   Run this only once, before `tutor_sessions` has any rows.
+
+### Ingesting a Math Engine corpus
+
+A corpus is a directory of `concepts/*.md` (chunked lesson content with
+frontmatter) and `questions/*.json` (the practice question bank), in the
+format documented by that corpus's own `validate.py`. Run its `validate.py`
+first to catch structural issues before ingesting. Then, with steps 7-8
+above already applied:
+
+```bash
+python scripts/ingest_math_engine_corpus.py /path/to/corpus
+```
+
+This embeds every retrievable concept chunk with Gemini's free-tier
+`gemini-embedding-001` (truncated to 1536 dims to match `concept_chunks`)
+and upserts both tables by their natural key (`chunk_key` /
+`question_id`) — safe to re-run after editing the corpus.
 
 Supported grades are 6-11 (`MIN_GRADE`/`MAX_GRADE` in `app/constants.py`). If
 you already ran `supabase_schema.sql` / `supabase_content_schema.sql` before
@@ -105,3 +132,18 @@ uvicorn app.main:app --reload --port 8000
   context). No auth required — same rationale as `GET /api/units`: the
   curriculum is shared, not per-student. Returns 502 if Gemini is unreachable
   or replies empty.
+- `GET /api/math-engine/next-question?grade=N&unit_id=` — the practice loop:
+  the engine picks a question, not the other way around. Returns the next
+  question (from the `questions` table, ingested from a corpus — see above)
+  for that grade/unit that this student hasn't solved yet, ordered easiest
+  first. Never includes `answer`/`solution_steps`/`hints`. Requires a bearer
+  token (progress is per-student). 404 once nothing is left to answer.
+- `POST /api/math-engine/answer` — body: `question_id`, `student_answer`.
+  Grades by exact/normalized match against the question's `answer` and
+  `accepted_variants` (case/whitespace-insensitive; numeric questions also
+  get a float-equality fallback). Upserts `tutor_sessions` (one row per
+  student+question) to track `attempts`/`hints_released`/`solved`. On a
+  wrong answer, releases the corpus's next pre-written hint (no LLM call —
+  the corpus already ships exactly 3 hints per question, ordered from a
+  conceptual nudge to nearly-there); once solved, returns the full
+  `solution_steps` instead. Requires a bearer token.

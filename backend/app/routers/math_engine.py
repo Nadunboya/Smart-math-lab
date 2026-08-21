@@ -1,9 +1,21 @@
-from fastapi import APIRouter, HTTPException, status
+import re
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from google import genai
 from google.genai.errors import APIError
 
 from ..config import settings
-from ..schemas import MathEngineAskIn, MathEngineAskOut, MathEngineSource
+from ..constants import MAX_GRADE, MIN_GRADE
+from ..deps import CurrentUser, get_current_user
+from ..schemas import (
+    AnswerIn,
+    AnswerOut,
+    MathEngineAskIn,
+    MathEngineAskOut,
+    MathEngineSource,
+    NextQuestionOut,
+)
 from ..supabase_client import supabase_admin
 
 router = APIRouter(prefix="/api/math-engine", tags=["math-engine"])
@@ -11,6 +23,7 @@ router = APIRouter(prefix="/api/math-engine", tags=["math-engine"])
 _gemini_client = genai.Client(api_key=settings.gemini_api_key)
 
 _TOP_K = 5
+_DIFFICULTY_ORDER = {"easy": 0, "medium": 1, "hard": 2}
 
 _MODE_INSTRUCTIONS = {
     "step_by_step": (
@@ -113,3 +126,118 @@ def ask(payload: MathEngineAskIn) -> MathEngineAskOut:
         )
 
     return MathEngineAskOut(answer=response.text, sources=sources)
+
+
+def _normalize(text: str) -> str:
+    return re.sub(r"\s+", " ", text.strip().lower()).rstrip(".")
+
+
+def _grade_answer(question: dict, student_answer: str) -> bool:
+    acceptable = {question["answer"], *question.get("accepted_variants", [])}
+    normalized_input = _normalize(student_answer)
+
+    if normalized_input in {_normalize(a) for a in acceptable}:
+        return True
+
+    if question["answer_type"] == "numeric":
+        try:
+            student_value = float(normalized_input)
+        except ValueError:
+            return False
+        for candidate in acceptable:
+            try:
+                if abs(float(candidate) - student_value) < 1e-9:
+                    return True
+            except ValueError:
+                continue
+
+    return False
+
+
+@router.get("/next-question", response_model=NextQuestionOut)
+def next_question(
+    grade: int = Query(ge=MIN_GRADE, le=MAX_GRADE),
+    unit_id: str | None = None,
+    user: CurrentUser = Depends(get_current_user),
+) -> NextQuestionOut:
+    solved_result = (
+        supabase_admin.table("tutor_sessions")
+        .select("question_id")
+        .eq("student_id", user.id)
+        .eq("solved", True)
+        .execute()
+    )
+    solved_ids = {row["question_id"] for row in solved_result.data}
+
+    query = supabase_admin.table("questions").select("*").eq("grade", grade)
+    if unit_id:
+        query = query.eq("unit_id", unit_id)
+    questions = query.execute().data
+
+    candidates = sorted(
+        (q for q in questions if q["question_id"] not in solved_ids),
+        key=lambda q: (_DIFFICULTY_ORDER.get(q["difficulty"], 99), q["question_id"]),
+    )
+    if not candidates:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No more questions available for this grade/unit",
+        )
+
+    return NextQuestionOut(**candidates[0])
+
+
+@router.post("/answer", response_model=AnswerOut)
+def submit_answer(payload: AnswerIn, user: CurrentUser = Depends(get_current_user)) -> AnswerOut:
+    question_result = (
+        supabase_admin.table("questions")
+        .select("*")
+        .eq("question_id", payload.question_id)
+        .limit(1)
+        .execute()
+    )
+    if not question_result.data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
+    question = question_result.data[0]
+
+    session_result = (
+        supabase_admin.table("tutor_sessions")
+        .select("*")
+        .eq("student_id", user.id)
+        .eq("question_id", payload.question_id)
+        .limit(1)
+        .execute()
+    )
+    session = session_result.data[0] if session_result.data else None
+    attempts = (session["attempts"] if session else 0) + 1
+    hints_released = session["hints_released"] if session else 0
+    solved = session["solved"] if session else False
+
+    correct = _grade_answer(question, payload.student_answer)
+    solved = solved or correct
+
+    hint = None
+    if not correct and hints_released < len(question["hints"]):
+        hint = question["hints"][hints_released]
+        hints_released += 1
+
+    supabase_admin.table("tutor_sessions").upsert(
+        {
+            "student_id": user.id,
+            "unit_id": question["unit_id"],
+            "question_id": payload.question_id,
+            "attempts": attempts,
+            "hints_released": hints_released,
+            "solved": solved,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        },
+        on_conflict="student_id,question_id",
+    ).execute()
+
+    return AnswerOut(
+        correct=correct,
+        attempts=attempts,
+        hints_released=hints_released,
+        hint=hint,
+        solution_steps=question["solution_steps"] if correct else None,
+    )
