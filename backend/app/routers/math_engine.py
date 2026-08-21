@@ -16,7 +16,7 @@ from ..schemas import (
     MathEngineSource,
     NextQuestionOut,
 )
-from ..supabase_client import supabase_admin
+from ..supabase_client import execute_with_retry, supabase_admin
 
 router = APIRouter(prefix="/api/math-engine", tags=["math-engine"])
 
@@ -42,21 +42,19 @@ _MODE_INSTRUCTIONS = {
 
 
 def _retrieve(question: str, grade: int) -> tuple[list[dict], list[MathEngineSource]]:
-    concepts_result = (
-        supabase_admin.table("concepts")
+    concepts_result = execute_with_retry(
+        lambda: supabase_admin.table("concepts")
         .select("name,description,body,units!inner(grade,name)")
         .eq("units.grade", grade)
         .text_search("search_vector", question, options={"config": "english", "type": "web_search"})
         .limit(_TOP_K)
-        .execute()
     )
-    notes_result = (
-        supabase_admin.table("short_notes")
+    notes_result = execute_with_retry(
+        lambda: supabase_admin.table("short_notes")
         .select("content,units!inner(grade,name)")
         .eq("units.grade", grade)
         .text_search("content", question, options={"config": "english", "type": "web_search"})
         .limit(_TOP_K)
-        .execute()
     )
 
     chunks: list[dict] = []
@@ -160,19 +158,21 @@ def next_question(
     unit_id: str | None = None,
     user: CurrentUser = Depends(get_current_user),
 ) -> NextQuestionOut:
-    solved_result = (
-        supabase_admin.table("tutor_sessions")
+    solved_result = execute_with_retry(
+        lambda: supabase_admin.table("tutor_sessions")
         .select("question_id")
         .eq("student_id", user.id)
         .eq("solved", True)
-        .execute()
     )
     solved_ids = {row["question_id"] for row in solved_result.data}
 
-    query = supabase_admin.table("questions").select("*").eq("grade", grade)
-    if unit_id:
-        query = query.eq("unit_id", unit_id)
-    questions = query.execute().data
+    def _build_questions_query():
+        query = supabase_admin.table("questions").select("*").eq("grade", grade)
+        if unit_id:
+            query = query.eq("unit_id", unit_id)
+        return query
+
+    questions = execute_with_retry(_build_questions_query).data
 
     candidates = sorted(
         (q for q in questions if q["question_id"] not in solved_ids),
@@ -189,24 +189,22 @@ def next_question(
 
 @router.post("/answer", response_model=AnswerOut)
 def submit_answer(payload: AnswerIn, user: CurrentUser = Depends(get_current_user)) -> AnswerOut:
-    question_result = (
-        supabase_admin.table("questions")
+    question_result = execute_with_retry(
+        lambda: supabase_admin.table("questions")
         .select("*")
         .eq("question_id", payload.question_id)
         .limit(1)
-        .execute()
     )
     if not question_result.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
     question = question_result.data[0]
 
-    session_result = (
-        supabase_admin.table("tutor_sessions")
+    session_result = execute_with_retry(
+        lambda: supabase_admin.table("tutor_sessions")
         .select("*")
         .eq("student_id", user.id)
         .eq("question_id", payload.question_id)
         .limit(1)
-        .execute()
     )
     session = session_result.data[0] if session_result.data else None
     attempts = (session["attempts"] if session else 0) + 1
@@ -221,18 +219,20 @@ def submit_answer(payload: AnswerIn, user: CurrentUser = Depends(get_current_use
         hint = question["hints"][hints_released]
         hints_released += 1
 
-    supabase_admin.table("tutor_sessions").upsert(
-        {
-            "student_id": user.id,
-            "unit_id": question["unit_id"],
-            "question_id": payload.question_id,
-            "attempts": attempts,
-            "hints_released": hints_released,
-            "solved": solved,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        },
-        on_conflict="student_id,question_id",
-    ).execute()
+    execute_with_retry(
+        lambda: supabase_admin.table("tutor_sessions").upsert(
+            {
+                "student_id": user.id,
+                "unit_id": question["unit_id"],
+                "question_id": payload.question_id,
+                "attempts": attempts,
+                "hints_released": hints_released,
+                "solved": solved,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            },
+            on_conflict="student_id,question_id",
+        )
+    )
 
     return AnswerOut(
         correct=correct,
