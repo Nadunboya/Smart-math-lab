@@ -5,7 +5,12 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Icons } from "../../lib/icons";
 import { createClient } from "../../../lib/supabase/client";
-import { AnswerResult, NextQuestion, StudentProfile } from "../../lib/types";
+import {
+  AnswerResult,
+  NextQuestion,
+  PassResult,
+  StudentProfile,
+} from "../../lib/types";
 
 const DIFFICULTY_COLOR: Record<string, string> = {
   easy: "#00D9C0",
@@ -24,6 +29,9 @@ export default function MathEnginePage({ profile }: { profile: StudentProfile })
   const [answer, setAnswer] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<AnswerResult | null>(null);
+  const [heartsRemaining, setHeartsRemaining] = useState(0);
+  const [passing, setPassing] = useState(false);
+  const [passedSteps, setPassedSteps] = useState<string[] | null>(null);
 
   const authHeaders = useCallback(async () => {
     const supabase = createClient();
@@ -43,6 +51,7 @@ export default function MathEnginePage({ profile }: { profile: StudentProfile })
     setLoading(true);
     setError(null);
     setResult(null);
+    setPassedSteps(null);
     setAnswer("");
 
     const headers = await authHeaders();
@@ -64,8 +73,10 @@ export default function MathEnginePage({ profile }: { profile: StudentProfile })
         throw new Error("Could not load the next question.");
       }
 
+      const next: NextQuestion = await res.json();
       setDone(false);
-      setQuestion(await res.json());
+      setQuestion(next);
+      setHeartsRemaining(next.hearts_total);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
@@ -103,11 +114,42 @@ export default function MathEnginePage({ profile }: { profile: StudentProfile })
         throw new Error("Could not check that answer.");
       }
 
-      setResult(await res.json());
+      const data: AnswerResult = await res.json();
+      setResult(data);
+      setHeartsRemaining(data.hearts_remaining);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handlePass = async () => {
+    if (!question || passing) return;
+
+    setPassing(true);
+    setError(null);
+
+    const headers = await authHeaders();
+    if (!headers) return;
+
+    try {
+      const res = await fetch(`${apiUrl}/api/math-engine/pass`, {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ question_id: question.question_id }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Could not pass this question.");
+      }
+
+      const data: PassResult = await res.json();
+      setPassedSteps(data.solution_steps);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setPassing(false);
     }
   };
 
@@ -141,6 +183,8 @@ export default function MathEnginePage({ profile }: { profile: StudentProfile })
     );
   }
 
+  const finished = result?.correct || passedSteps !== null;
+
   return (
     <div className="max-w-2xl mx-auto py-6 md:py-10">
       <div className="flex items-center gap-2.5 mb-6">
@@ -169,28 +213,41 @@ export default function MathEnginePage({ profile }: { profile: StudentProfile })
           transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
           className="bg-card-navy border border-white/[0.06] rounded-3xl p-6 md:p-8 shadow-card-dark"
         >
-          <div className="flex items-center gap-2 mb-4">
-            <span
-              className="text-[11px] font-semibold px-2.5 py-1 rounded-full capitalize"
-              style={{
-                color: DIFFICULTY_COLOR[question.difficulty] ?? "#00D9C0",
-                background: `${DIFFICULTY_COLOR[question.difficulty] ?? "#00D9C0"}18`,
-              }}
-            >
-              {question.difficulty}
-            </span>
-            {question.subtopic && (
-              <span className="text-[11px] text-white/35">
-                {question.subtopic}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <span
+                className="text-[11px] font-semibold px-2.5 py-1 rounded-full capitalize"
+                style={{
+                  color: DIFFICULTY_COLOR[question.difficulty] ?? "#00D9C0",
+                  background: `${DIFFICULTY_COLOR[question.difficulty] ?? "#00D9C0"}18`,
+                }}
+              >
+                {question.difficulty}
               </span>
-            )}
+              {question.subtopic && (
+                <span className="text-[11px] text-white/35">
+                  {question.subtopic}
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1" aria-label={`${heartsRemaining} of ${question.hearts_total} hearts remaining`}>
+              {Array.from({ length: question.hearts_total }).map((_, i) => (
+                <Icons.heart
+                  key={i}
+                  size={16}
+                  filled={i < heartsRemaining}
+                  color={i < heartsRemaining ? "#FF4D6D" : "rgba(255,255,255,0.18)"}
+                />
+              ))}
+            </div>
           </div>
 
           <p className="font-heading text-base md:text-lg text-white leading-relaxed mb-6">
             {question.prompt}
           </p>
 
-          {!result?.correct && (
+          {!finished && (
             <form onSubmit={handleSubmit} className="space-y-3">
               <input
                 type="text"
@@ -207,11 +264,21 @@ export default function MathEnginePage({ profile }: { profile: StudentProfile })
               >
                 {submitting ? "Checking…" : "Check answer"}
               </button>
+              {heartsRemaining === 0 && (
+                <button
+                  type="button"
+                  onClick={handlePass}
+                  disabled={passing}
+                  className="w-full rounded-xl border border-white/[0.1] text-white/60 font-medium text-sm py-3 hover:bg-white/[0.04] transition-colors disabled:opacity-60"
+                >
+                  {passing ? "Passing…" : "Out of hearts — pass this question"}
+                </button>
+              )}
             </form>
           )}
 
           <AnimatePresence mode="wait">
-            {result && !result.correct && (
+            {result && !result.correct && !passedSteps && (
               <motion.div
                 key="hint"
                 initial={{ opacity: 0, y: 8 }}
@@ -224,7 +291,7 @@ export default function MathEnginePage({ profile }: { profile: StudentProfile })
                 </p>
                 <p className="text-sm text-white/70">
                   {result.hint ??
-                    "Take another look at the question and try again."}
+                    "No hints left — try again, or pass this one."}
                 </p>
               </motion.div>
             )}
@@ -247,6 +314,32 @@ export default function MathEnginePage({ profile }: { profile: StudentProfile })
                       ))}
                     </ol>
                   )}
+                </div>
+                <button
+                  onClick={loadNextQuestion}
+                  className="w-full rounded-xl bg-gradient-to-r from-cosmic to-nebula text-white font-medium text-sm py-3 shadow-glow-cosmic hover:opacity-90 transition-opacity"
+                >
+                  Next question
+                </button>
+              </motion.div>
+            )}
+
+            {passedSteps && (
+              <motion.div
+                key="passed"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-4"
+              >
+                <div className="rounded-xl border border-white/[0.1] bg-white/[0.04] px-4 py-3 mb-4">
+                  <p className="text-sm font-semibold text-white/70 mb-2">
+                    Here&apos;s how it&apos;s solved
+                  </p>
+                  <ol className="list-decimal list-inside space-y-1 text-sm text-white/60">
+                    {passedSteps.map((step, i) => (
+                      <li key={i}>{step}</li>
+                    ))}
+                  </ol>
                 </div>
                 <button
                   onClick={loadNextQuestion}

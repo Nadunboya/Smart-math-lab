@@ -178,6 +178,27 @@ export const Icons = {
     </svg>
   ),
 
+  heart: ({
+    size = 20,
+    color = "currentColor",
+    filled = true,
+    className,
+  }: IconProps & { filled?: boolean }) => (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill={filled ? color : "none"}
+      stroke={color}
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M12 21s-6.7-4.35-9.3-8.2C1.1 10.4 1.6 7 4.4 5.5c2.2-1.2 4.8-.4 6.1 1.5l1.5 2.1 1.5-2.1c1.3-1.9 3.9-2.7 6.1-1.5 2.8 1.5 3.3 4.9 1.7 7.3C18.7 16.65 12 21 12 21z" />
+    </svg>
+  ),
+
   google: ({ size = 20, className }: IconProps) => (
     <svg
       width={size}
