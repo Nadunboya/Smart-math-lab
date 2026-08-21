@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { Unit } from "../../lib/types";
 import { UnitIcons, Icons } from "../../lib/icons";
 import NoteCard from "./NoteCard";
@@ -62,39 +60,31 @@ export default function ShortNotesPage({ units }: ShortNotesPageProps) {
             </div>
           </div>
 
-          {selectedUnit.concepts.length === 0 ? (
+          {selectedUnit.short_notes.length === 0 ? (
             <div className="rounded-2xl border border-white/[0.06] bg-card-navy p-10 text-center">
               <p className="text-white/70 font-medium mb-1">
                 Full notes coming soon
               </p>
               <p className="text-sm text-slate">
-                Lesson content for this unit hasn&apos;t been added yet.
+                Short notes for this unit haven&apos;t been added yet.
               </p>
             </div>
           ) : (
-            <div className="space-y-6">
-              {selectedUnit.concepts.map((concept) => (
-                <div
-                  key={concept.id}
-                  className="rounded-2xl border border-white/[0.06] bg-card-navy p-6 md:p-8"
-                >
-                  <h3
-                    className="font-heading font-semibold text-lg mb-4"
-                    style={{ color: selectedUnit.accent_color }}
+            <div className="rounded-2xl border border-white/[0.06] bg-card-navy p-6 md:p-8">
+              <ul className="space-y-4">
+                {selectedUnit.short_notes.map((note) => (
+                  <li
+                    key={note.id}
+                    className="flex items-start gap-3 text-sm text-white/70 leading-relaxed"
                   >
-                    {concept.name}
-                  </h3>
-                  {concept.body ? (
-                    <div className="concept-markdown">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                        {concept.body}
-                      </ReactMarkdown>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-slate">{concept.description}</p>
-                  )}
-                </div>
-              ))}
+                    <span
+                      className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0"
+                      style={{ background: selectedUnit.accent_color }}
+                    />
+                    {note.content}
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
         </motion.div>
