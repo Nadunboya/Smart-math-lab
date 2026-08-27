@@ -101,6 +101,20 @@ to whichever grades they entered.
 uvicorn app.main:app --reload --port 8000
 ```
 
+## Tests
+
+```bash
+pytest -v
+```
+
+Currently covers answer validation (`app/grading.py`, used by
+`POST /api/math-engine/answer`) — exact/case/whitespace matching,
+numeric equivalence, and accepted-variant matching, with the
+deliberately-rejected cases (e.g. an unlisted equivalent fraction)
+included alongside the accepted ones. No Supabase/Gemini credentials
+needed to run it: grading is pure logic with no I/O, kept in its own
+module for exactly this reason.
+
 ## Endpoints
 
 - `GET /api/students/me` — returns the signed-in user's profile, or 404 if
