@@ -7,6 +7,7 @@ import { UnitIcons, Icons } from "../../lib/icons";
 import UnitCard from "./UnitCard";
 import ConceptCard from "./ConceptCard";
 import ConceptDetail from "./ConceptDetail";
+import NumberLinePractical from "./NumberLinePractical";
 import WelcomeBanner from "../WelcomeBanner";
 
 interface MathLabPageProps {
@@ -110,6 +111,10 @@ export default function MathLabPage({
               />
             ))}
           </div>
+
+          {selectedUnit.name === "Number Line" && (
+            <NumberLinePractical accentColor={selectedUnit.accent_color} />
+          )}
         </motion.div>
       </AnimatePresence>
     );
