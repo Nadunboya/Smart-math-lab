@@ -7,6 +7,8 @@ class Settings(BaseSettings):
     supabase_url: str
     supabase_service_role_key: str
     allowed_origins: str = "http://localhost:3000"
+    gemini_api_key: str
+    gemini_model: str = "gemini-2.5-flash"
 
     @property
     def allowed_origins_list(self) -> list[str]:

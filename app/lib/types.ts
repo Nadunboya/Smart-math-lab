@@ -35,6 +35,46 @@ export interface Unit {
   short_notes: ShortNote[];
 }
 
+export interface NextQuestion {
+  question_id: string;
+  unit_id: string;
+  subtopic: string | null;
+  difficulty: "easy" | "medium" | "hard";
+  prompt: string;
+}
+
+export interface AnswerResult {
+  correct: boolean;
+  attempts: number;
+  hints_released: number;
+  hint: string | null;
+  solution_steps: string[] | null;
+}
+
+export interface HeartsInfo {
+  hearts_remaining: number;
+  hearts_max: number;
+  next_refill_at: string | null;
+}
+
+export interface PassResult {
+  passed: boolean;
+  solution_steps: string[];
+  hearts_remaining: number;
+  next_refill_at: string | null;
+}
+
+export interface StudentProgress {
+  student_id: string;
+  student_name: string;
+  grade: number;
+  questions_total: number;
+  questions_solved: number;
+  questions_passed: number;
+  questions_attempted: number;
+  last_activity_at: string | null;
+}
+
 export interface TeacherProfile {
   email: string;
   full_name: string | null;

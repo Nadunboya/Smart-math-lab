@@ -73,11 +73,6 @@ export default function HomeClient({
     router.replace("/login");
   }, [showToast, router]);
 
-  /* Notes read more */
-  const handleReadMore = useCallback(() => {
-    showToast("Full notes will load here — connect to backend", "info");
-  }, [showToast]);
-
   return (
     <div className="min-h-screen relative z-[1]">
       <Navbar
@@ -104,10 +99,8 @@ export default function HomeClient({
               profile={profile}
             />
           )}
-          {activeTab === "notes" && (
-            <ShortNotesPage units={units} onReadMore={handleReadMore} />
-          )}
-          {activeTab === "engine" && <MathEnginePage />}
+          {activeTab === "notes" && <ShortNotesPage units={units} />}
+          {activeTab === "engine" && <MathEnginePage profile={profile} />}
         </div>
       </main>
 

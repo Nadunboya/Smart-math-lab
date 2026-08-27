@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -89,6 +90,79 @@ class UnitIn(BaseModel):
     sort_order: int = 0
     concepts: list[ConceptIn] = Field(default_factory=list)
     short_notes: list[ShortNoteIn] = Field(default_factory=list)
+
+
+class NextQuestionOut(BaseModel):
+    question_id: str
+    unit_id: str
+    subtopic: str | None
+    difficulty: str
+    prompt: str
+
+
+class AnswerIn(BaseModel):
+    question_id: str = Field(min_length=1, max_length=100)
+    student_answer: str = Field(min_length=1, max_length=500)
+
+
+class AnswerOut(BaseModel):
+    correct: bool
+    attempts: int
+    hints_released: int
+    hint: str | None
+    solution_steps: list[str] | None
+
+
+class HeartsOut(BaseModel):
+    hearts_remaining: int
+    hearts_max: int
+    next_refill_at: datetime | None
+
+
+class PassIn(BaseModel):
+    question_id: str = Field(min_length=1, max_length=100)
+
+
+class PassOut(BaseModel):
+    passed: bool
+    solution_steps: list[str]
+    hearts_remaining: int
+    next_refill_at: datetime | None
+
+
+class StudentProgressOut(BaseModel):
+    student_id: str
+    student_name: str
+    grade: int
+    questions_total: int
+    questions_solved: int
+    questions_passed: int
+    questions_attempted: int
+    last_activity_at: datetime | None
+
+
+class MathEngineAskIn(BaseModel):
+    question: str = Field(min_length=1, max_length=2000)
+    grade: int = Field(ge=MIN_GRADE, le=MAX_GRADE)
+    mode: Literal["step_by_step", "hint", "concept"] = "step_by_step"
+
+    @field_validator("question")
+    @classmethod
+    def not_blank(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("must not be blank")
+        return stripped
+
+
+class MathEngineSource(BaseModel):
+    unit_name: str
+    concept_name: str
+
+
+class MathEngineAskOut(BaseModel):
+    answer: str
+    sources: list[MathEngineSource]
 
 
 class TeacherOnboardingIn(BaseModel):
