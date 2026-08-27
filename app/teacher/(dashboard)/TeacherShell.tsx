@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { Icons } from "../../lib/icons";
 import { TeacherProfile } from "../../lib/types";
@@ -14,6 +14,7 @@ export default function TeacherShell({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
 
   const handleLogout = async () => {
     const supabase = createClient();
@@ -51,6 +52,23 @@ export default function TeacherShell({
           </div>
         </div>
       </nav>
+
+      <div className="border-b border-white/[0.06] bg-deep">
+        <div className="max-w-5xl mx-auto px-4 md:px-8 flex items-center gap-6">
+          <Link
+            href="/teacher"
+            className={`nav-tab ${pathname === "/teacher" ? "active" : ""}`}
+          >
+            Units
+          </Link>
+          <Link
+            href="/teacher/progress"
+            className={`nav-tab ${pathname === "/teacher/progress" ? "active" : ""}`}
+          >
+            Progress
+          </Link>
+        </div>
+      </div>
 
       <main className="max-w-5xl mx-auto px-4 md:px-8 py-10">{children}</main>
     </div>

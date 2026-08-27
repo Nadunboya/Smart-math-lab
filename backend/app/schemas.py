@@ -130,6 +130,17 @@ class PassOut(BaseModel):
     next_refill_at: datetime | None
 
 
+class StudentProgressOut(BaseModel):
+    student_id: str
+    student_name: str
+    grade: int
+    questions_total: int
+    questions_solved: int
+    questions_passed: int
+    questions_attempted: int
+    last_activity_at: datetime | None
+
+
 class MathEngineAskIn(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
     grade: int = Field(ge=MIN_GRADE, le=MAX_GRADE)

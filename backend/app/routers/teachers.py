@@ -1,8 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from collections import defaultdict
+from datetime import datetime
 
-from ..deps import CurrentUser, get_current_user
-from ..schemas import TeacherOnboardingIn, TeacherOut
-from ..supabase_client import supabase_admin
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+
+from ..constants import MAX_GRADE, MIN_GRADE
+from ..deps import (
+    CurrentTeacher,
+    CurrentUser,
+    get_current_teacher,
+    get_current_user,
+    require_grade_access,
+)
+from ..schemas import StudentProgressOut, TeacherOnboardingIn, TeacherOut
+from ..supabase_client import execute_with_retry, supabase_admin
 
 router = APIRouter(prefix="/api/teachers", tags=["teachers"])
 
@@ -73,3 +83,68 @@ def complete_teacher_onboarding(
         )
 
     return result.data[0]
+
+
+def _parse_ts(value: str) -> datetime:
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+@router.get("/progress", response_model=list[StudentProgressOut])
+def get_student_progress(
+    grade: int = Query(ge=MIN_GRADE, le=MAX_GRADE),
+    teacher: CurrentTeacher = Depends(get_current_teacher),
+) -> list[StudentProgressOut]:
+    """Basic per-student progress for a grade: how many of that grade's Math
+    Engine questions each student has solved, passed (revealed instead of
+    solving), or attempted at all. Teacher-only, scoped to their own grades."""
+    require_grade_access(grade, teacher)
+
+    students_result = execute_with_retry(
+        lambda: supabase_admin.table("students").select("id,student_name,grade").eq("grade", grade)
+    )
+    students = students_result.data
+    if not students:
+        return []
+
+    student_ids = [s["id"] for s in students]
+
+    questions_count_result = execute_with_retry(
+        lambda: supabase_admin.table("questions")
+        .select("question_id", count="exact")
+        .eq("grade", grade)
+        .limit(1)
+    )
+    questions_total = questions_count_result.count or 0
+
+    sessions_result = execute_with_retry(
+        lambda: supabase_admin.table("tutor_sessions")
+        .select("student_id,solved,passed,updated_at")
+        .in_("student_id", student_ids)
+    )
+
+    sessions_by_student: dict[str, list[dict]] = defaultdict(list)
+    for row in sessions_result.data:
+        sessions_by_student[row["student_id"]].append(row)
+
+    progress = []
+    for student in students:
+        rows = sessions_by_student.get(student["id"], [])
+        solved = sum(1 for r in rows if r["solved"])
+        passed = sum(1 for r in rows if r["passed"] and not r["solved"])
+        last_activity_at = max((_parse_ts(r["updated_at"]) for r in rows), default=None)
+
+        progress.append(
+            StudentProgressOut(
+                student_id=student["id"],
+                student_name=student["student_name"],
+                grade=student["grade"],
+                questions_total=questions_total,
+                questions_solved=solved,
+                questions_passed=passed,
+                questions_attempted=len(rows),
+                last_activity_at=last_activity_at,
+            )
+        )
+
+    progress.sort(key=lambda p: p.student_name)
+    return progress

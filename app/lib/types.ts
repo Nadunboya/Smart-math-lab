@@ -64,6 +64,17 @@ export interface PassResult {
   next_refill_at: string | null;
 }
 
+export interface StudentProgress {
+  student_id: string;
+  student_name: string;
+  grade: number;
+  questions_total: number;
+  questions_solved: number;
+  questions_passed: number;
+  questions_attempted: number;
+  last_activity_at: string | null;
+}
+
 export interface TeacherProfile {
   email: string;
   full_name: string | null;
