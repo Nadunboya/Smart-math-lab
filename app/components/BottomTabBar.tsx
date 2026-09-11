@@ -2,7 +2,7 @@
 
 import { Icons } from "../lib/icons";
 
-type TabKey = "lab" | "notes" | "engine";
+type TabKey = "lab" | "notes" | "engine" | "profile";
 
 interface BottomTabBarProps {
   activeTab: TabKey;

@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Icons } from "../lib/icons";
 import { StudentProfile } from "../lib/types";
 
-type TabKey = "lab" | "notes" | "engine";
+type TabKey = "lab" | "notes" | "engine" | "profile";
 
 interface NavbarProps {
   activeTab: TabKey;
@@ -24,6 +24,7 @@ const tabs: {
   { key: "lab", label: "Math Lab", Icon: Icons.flask },
   { key: "notes", label: "Short Notes", Icon: Icons.file },
   { key: "engine", label: "Math Engine", Icon: Icons.spark },
+  { key: "profile", label: "Profile", Icon: Icons.user },
 ];
 
 export default function Navbar({
@@ -121,15 +122,29 @@ export default function Navbar({
                     </p>
                   </div>
                   <div className="py-1.5">
-                    {["My Profile", "Settings"].map((item) => (
-                      <button
-                        key={item}
-                        role="menuitem"
-                        className="w-full text-left px-4 py-2.5 text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors"
-                      >
-                        {item}
-                      </button>
-                    ))}
+                    <button
+                      role="menuitem"
+                      onClick={() => {
+                        setActiveTab("profile");
+                        setProfileOpen(false);
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-sm text-white/70
+                            hover:text-white hover:bg-white/5 transition-colors"
+                    >
+                      My Profile
+                    </button>
+
+                    <button
+                      role="menuitem"
+                      onClick={() => {
+                        // Open settings or navigate to /settings
+                        setProfileOpen(false);
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-sm text-white/70
+                            hover:text-white hover:bg-white/5 transition-colors"
+                    >
+                      Settings
+                    </button>
                   </div>
                   <div className="border-t border-white/[0.06] py-1.5">
                     <button
