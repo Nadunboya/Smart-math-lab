@@ -11,8 +11,9 @@ import ToastContainer from "./components/ToastContainer";
 import { useToast } from "../hooks/useToast";
 import { Unit, StudentProfile } from "./lib/types";
 import { createClient } from "../lib/supabase/client";
+import ProfilePage from "./components/profile";
 
-type TabKey = "lab" | "notes" | "engine";
+type TabKey = "lab" | "notes" | "engine" | "profile";
 
 export default function HomeClient({
   profile,
@@ -99,8 +100,17 @@ export default function HomeClient({
               profile={profile}
             />
           )}
+
           {activeTab === "notes" && <ShortNotesPage units={units} />}
+
           {activeTab === "engine" && <MathEnginePage profile={profile} />}
+
+          {activeTab === "profile" && (
+            <ProfilePage
+              profile={profile}
+              onEdit={() => showToast("Profile editing is coming soon", "info")}
+            />
+          )}
         </div>
       </main>
 

@@ -1,4 +1,3 @@
-import re
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -8,6 +7,7 @@ from google.genai.errors import APIError
 from ..config import settings
 from ..constants import MAX_GRADE, MIN_GRADE
 from ..deps import CurrentUser, get_current_user
+from ..grading import grade_answer
 from ..schemas import (
     AnswerIn,
     AnswerOut,
@@ -198,32 +198,6 @@ def ask(payload: MathEngineAskIn) -> MathEngineAskOut:
     return MathEngineAskOut(answer=response.text, sources=sources)
 
 
-def _normalize(text: str) -> str:
-    return re.sub(r"\s+", " ", text.strip().lower()).rstrip(".")
-
-
-def _grade_answer(question: dict, student_answer: str) -> bool:
-    acceptable = {question["answer"], *question.get("accepted_variants", [])}
-    normalized_input = _normalize(student_answer)
-
-    if normalized_input in {_normalize(a) for a in acceptable}:
-        return True
-
-    if question["answer_type"] == "numeric":
-        try:
-            student_value = float(normalized_input)
-        except ValueError:
-            return False
-        for candidate in acceptable:
-            try:
-                if abs(float(candidate) - student_value) < 1e-9:
-                    return True
-            except ValueError:
-                continue
-
-    return False
-
-
 @router.get("/hearts", response_model=HeartsOut)
 def get_hearts(user: CurrentUser = Depends(get_current_user)) -> HeartsOut:
     hearts, last_regen_at = _get_hearts(user.id)
@@ -293,7 +267,7 @@ def submit_answer(payload: AnswerIn, user: CurrentUser = Depends(get_current_use
     hints_released = session["hints_released"] if session else 0
     solved = session["solved"] if session else False
 
-    correct = _grade_answer(question, payload.student_answer)
+    correct = grade_answer(question, payload.student_answer)
     solved = solved or correct
 
     hint = None
